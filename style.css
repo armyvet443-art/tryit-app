@@ -1,23 +1,53 @@
+/* General page styling */
 body {
-  font-family: Arial, sans-serif;
-  background-color: #f9fafc;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: linear-gradient(135deg, #74ebd5, #ACB6E5);
   color: #222;
-  margin: 40px;
-  text-align: center;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
+/* Main heading */
 h1 {
-  color: #2c3e50;
-  font-size: 2.5em;
+  color: #fff;
+  font-size: 3em;
+  margin-bottom: 10px;
+  text-shadow: 2px 2px 6px rgba(0,0,0,0.3);
 }
 
+/* Paragraph text */
 p {
-  font-size: 1.2em;
-  margin-top: 10px;
+  font-size: 1.3em;
+  margin: 5px 0;
+  color: #fdfdfd;
 }
 
+/* Buttons */
+button {
+  margin-top: 20px;
+  padding: 12px 24px;
+  background-color: #2c3e50;
+  color: white;
+  font-size: 1em;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+button:hover {
+  background-color: #1abc9c;
+}
+
+/* Footer */
 footer {
-  margin-top: 40px;
+  margin-top: auto;
+  padding: 15px;
   font-size: 0.9em;
-  color: #555;
+  color: #eee;
 }
