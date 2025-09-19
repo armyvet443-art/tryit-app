@@ -1,41 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Contact • Try It App</title>
-  <style>
-    :root { --brand:#0078d7; --text:#333; --muted:#555; --bg:#f4f4f4; }
-    body{font-family:Arial, sans-serif; margin:0; padding:0; background:var(--bg);}
-    nav{display:flex; gap:18px; align-items:center; justify-content:center; padding:14px 10px; background:#fff; border-bottom:1px solid #e7e7e7}
-    nav a{text-decoration:none; color:var(--text); font-weight:600}
-    nav a:hover{text-decoration:underline}
-    main{max-width:760px; margin:40px auto; padding:0 16px; background:#fff; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.05)}
-    h1{text-align:center; color:var(--text); padding-top:24px}
-    form{display:flex; flex-direction:column; gap:12px; padding:24px}
-    input, textarea{font-size:16px; padding:12px; border:1px solid #ddd; border-radius:6px}
-    button{background:var(--brand); color:#fff; border:0; padding:12px 16px; border-radius:6px; cursor:pointer; font-size:16px}
-    button:hover{background:#005fa3}
-    footer{text-align:center; margin:30px 0; color:#777; font-size:14px}
-  </style>
+  <link rel="stylesheet" href="style.css?v=1">
 </head>
 <body>
+  <img src="logo_resized2.jpg" alt="Try It App Logo">
+
   <nav>
     <a href="index.html">Home</a>
     <a href="about.html">About</a>
     <a href="contact.html"><strong>Contact</strong></a>
+    <button id="toggle-dark" class="btn" style="margin-left:auto;">🌙 Toggle Dark</button>
   </nav>
 
-  <main>
-    <h1>Contact</h1>
-    <form onsubmit="event.preventDefault(); alert('Thanks! We’ll get back to you.');">
-      <input type="text" name="name" placeholder="Your name" required>
-      <input type="email" name="email" placeholder="Your email" required>
-      <textarea name="message" rows="5" placeholder="Your message"></textarea>
-      <button type="submit">Send</button>
+  <div class="card" style="max-width:900px;">
+    <h1 style="text-align:left;">Contact</h1>
+    <form id="contact-form">
+      <label for="name">Your name</label>
+      <input id="name" name="name" type="text" required>
+
+      <label for="email">Your email</label>
+      <input id="email" name="email" type="email" required>
+
+      <label for="message">Message</label>
+      <textarea id="message" name="message" rows="5" required></textarea>
+
+      <button class="btn" type="submit">Send</button>
     </form>
-  </main>
+  </div>
 
   <footer>© 2025 Try It App</footer>
+
+  <script>
+    // Persisted dark mode toggle
+    if(localStorage.getItem('darkMode')==='true'){document.body.classList.add('dark');}
+    document.getElementById('toggle-dark').onclick=()=>{
+      document.body.classList.toggle('dark');
+      localStorage.setItem('darkMode', document.body.classList.contains('dark'));
+    };
+
+    // Demo-only submit (no backend yet)
+    document.getElementById('contact-form').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      alert('Thanks! Your message was recorded locally for demo purposes.');
+      e.target.reset();
+    });
+  </script>
 </body>
 </html>
