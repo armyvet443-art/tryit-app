@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Try It App 🚀</title>
   <style>
-    :root { --brand:#0078d7; --text:#333; --muted:#555; --bg:#f4f4f4; --danger:#c62828; }
+    :root {
+      --brand:#0078d7; --text:#333; --muted:#555; --bg:#f4f4f4; --danger:#c62828;
+    }
     body{font-family:Arial, sans-serif; text-align:center; margin:0; padding:0; background:var(--bg);}
     /* NAV */
     nav{display:flex; gap:18px; align-items:center; justify-content:center; padding:14px 10px; background:#fff; border-bottom:1px solid #e7e7e7; position:sticky; top:0; z-index:10}
@@ -22,11 +24,16 @@
     .btn-danger{background:var(--danger)}
     .btn-danger:hover{background:#9e1f1f}
     /* CARDS / FORM */
-    .card{max-width:760px; margin:30px auto; background:#fff; border-radius:10px; padding:22px; box-shadow:0 2px 10px rgba(0,0,0,.06); text-align:left}
+    .card{max-width:900px; margin:30px auto; background:#fff; border-radius:10px; padding:22px; box-shadow:0 2px 10px rgba(0,0,0,.06); text-align:left}
     label{display:block; margin:12px 0 6px; font-weight:600; color:var(--text)}
     input, textarea, select{width:100%; padding:10px; font-size:16px; border:1px solid #ccc; border-radius:6px}
+    .row{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+    @media (max-width:700px){ .row{grid-template-columns:1fr;} }
     /* ENTRIES */
     .entries{margin-top:24px}
+    .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between}
+    .filters{display:flex; gap:10px; flex-wrap:wrap}
+    .filters input[type="search"], .filters select{padding:10px; border:1px solid #ccc; border-radius:6px; font-size:16px}
     .entry{padding:14px; border:1px solid #eee; border-radius:10px; margin-bottom:12px; background:#fafafa; display:flex; align-items:flex-start; justify-content:space-between; gap:12px}
     .entry-main{max-width:80%}
     .entry h3{margin:0 0 6px; color:var(--brand)}
@@ -34,6 +41,7 @@
     .entry .meta{font-size:13px; color:#888}
     .entry .actions{display:flex; gap:8px}
     .empty{color:#888; font-style:italic; text-align:center; padding:12px 0}
+    .badge{display:inline-block; background:#eaf3ff; color:#155fa0; border:1px solid #cfe3ff; padding:2px 8px; border-radius:999px; font-size:12px; margin-left:6px}
   </style>
 </head>
 <body>
@@ -53,8 +61,22 @@
   <!-- Submission Form -->
   <div class="card">
     <form id="tryit-form">
-      <label for="title">Title</label>
-      <input type="text" id="title" name="title" placeholder="e.g. New restaurant" required>
+      <div class="row">
+        <div>
+          <label for="title">Title</label>
+          <input type="text" id="title" name="title" placeholder="e.g. New restaurant" required>
+        </div>
+        <div>
+          <label for="category">Category</label>
+          <select id="category" name="category" required>
+            <option value="">-- Select --</option>
+            <option>Food</option>
+            <option>Product</option>
+            <option>Travel</option>
+            <option>Fitness</option>
+          </select>
+        </div>
+      </div>
 
       <label for="desc">Description</label>
       <textarea id="desc" name="desc" rows="3" placeholder="What was your experience?" required></textarea>
@@ -75,9 +97,20 @@
 
   <!-- List of entries -->
   <div class="card entries" id="entries">
-    <div style="display:flex; align-items:center; justify-content:space-between;">
+    <div class="toolbar">
       <h2 style="margin:0;">Recent Submissions</h2>
-      <button id="clear-all" class="btn btn-danger" title="Remove all saved submissions">Clear all</button>
+      <div class="filters">
+        <input type="search" id="search" placeholder="Search title/description...">
+        <select id="filter-category">
+          <option value="All">All Categories</option>
+          <option value="Food">Food</option>
+          <option value="Product">Product</option>
+          <option value="Travel">Travel</option>
+          <option value="Fitness">Fitness</option>
+          <option value="Uncategorized">Uncategorized</option>
+        </select>
+        <button id="clear-all" class="btn btn-danger" title="Remove all saved submissions">Clear all</button>
+      </div>
     </div>
     <div id="entries-list"></div>
   </div>
@@ -91,7 +124,19 @@
     const form = document.getElementById('tryit-form');
     const clearBtn = document.getElementById('clear-all');
 
+    // Filters
+    const searchInput = document.getElementById('search');
+    const filterCategory = document.getElementById('filter-category');
+
     let entries = JSON.parse(localStorage.getItem(LS_KEY)) || [];
+
+    // Migrate old entries (without category) to "Uncategorized"
+    let migrated = false;
+    entries = entries.map(e => {
+      if (!e.category) { migrated = true; return {...e, category: 'Uncategorized'}; }
+      return e;
+    });
+    if (migrated) localStorage.setItem(LS_KEY, JSON.stringify(entries));
 
     function save() {
       localStorage.setItem(LS_KEY, JSON.stringify(entries));
@@ -99,48 +144,62 @@
 
     function formatDate(ts){
       const d = new Date(ts);
-      // Show local date/time briefly
       return d.toLocaleString();
     }
 
-    // ====== Render ======
+    // ====== Rendering with filters ======
+    function getFilteredEntries() {
+      const q = searchInput.value.trim().toLowerCase();
+      const cat = filterCategory.value;
+
+      return entries.filter(e => {
+        const matchesCat = (cat === 'All') ? true : (e.category === cat);
+        const hay = (e.title + ' ' + e.desc).toLowerCase();
+        const matchesSearch = q ? hay.includes(q) : true;
+        return matchesCat && matchesSearch;
+      });
+    }
+
     function renderEntries() {
+      const list = getFilteredEntries();
       entriesList.innerHTML = '';
-      if (entries.length === 0) {
-        entriesList.innerHTML = '<div class="empty">No submissions yet — be the first!</div>';
+      if (list.length === 0) {
+        entriesList.innerHTML = '<div class="empty">No submissions match your filters.</div>';
         return;
       }
 
-      entries.forEach((e, i) => {
+      list.forEach((e, i) => {
         const div = document.createElement('div');
         div.className = 'entry';
         div.innerHTML = `
           <div class="entry-main">
-            <h3>${escapeHTML(e.title)}</h3>
+            <h3>${escapeHTML(e.title)} <span class="badge">${escapeHTML(e.category)}</span></h3>
             <p>${escapeHTML(e.desc)}</p>
             <p>Rating: ${'⭐'.repeat(e.rating)}</p>
             <div class="meta">Saved: ${formatDate(e.ts)}</div>
           </div>
           <div class="actions">
-            <button class="btn btn-danger" data-index="${i}" aria-label="Delete entry ${i+1}">Delete</button>
+            <button class="btn btn-danger" data-id="${e.ts}" aria-label="Delete entry">Delete</button>
           </div>
         `;
         entriesList.appendChild(div);
       });
 
-      // Attach delete handlers
+      // Attach delete handlers (by timestamp id)
       document.querySelectorAll('.actions .btn-danger').forEach(btn => {
         btn.addEventListener('click', (ev) => {
-          const idx = Number(ev.currentTarget.getAttribute('data-index'));
-          if (!Number.isInteger(idx)) return;
-          entries.splice(idx, 1);
-          save();
-          renderEntries();
+          const id = Number(ev.currentTarget.getAttribute('data-id'));
+          const idx = entries.findIndex(x => x.ts === id);
+          if (idx >= 0) {
+            entries.splice(idx, 1);
+            save();
+            renderEntries();
+          }
         });
       });
     }
 
-    // Basic HTML escaping to avoid injecting tags
+    // Basic HTML escaping
     function escapeHTML(str){
       return String(str)
         .replaceAll('&','&amp;')
@@ -156,15 +215,15 @@
       const title = document.getElementById('title').value.trim();
       const desc = document.getElementById('desc').value.trim();
       const rating = Number(document.getElementById('rating').value);
+      const category = document.getElementById('category').value;
 
-      if (!title || !desc || !rating) return;
+      if (!title || !desc || !rating || !category) return;
 
-      const newEntry = { title, desc, rating, ts: Date.now() };
-      entries.unshift(newEntry);           // newest first
+      const newEntry = { title, desc, rating, category, ts: Date.now() };
+      entries.unshift(newEntry); // newest first
       save();
       form.reset();
       renderEntries();
-      // optional toast
       alert('Submitted! 🎉');
     });
 
@@ -178,6 +237,10 @@
       renderEntries();
       alert('All submissions cleared.');
     });
+
+    // ====== Filter events ======
+    searchInput.addEventListener('input', renderEntries);
+    filterCategory.addEventListener('change', renderEntries);
 
     // Initial render
     renderEntries();
