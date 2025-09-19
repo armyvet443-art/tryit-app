@@ -5,27 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Try It App 🚀</title>
   <style>
-    :root { --brand:#0078d7; --text:#333; --muted:#555; --bg:#f4f4f4; }
+    :root { --brand:#0078d7; --text:#333; --muted:#555; --bg:#f4f4f4; --danger:#c62828; }
     body{font-family:Arial, sans-serif; text-align:center; margin:0; padding:0; background:var(--bg);}
     /* NAV */
-    nav{display:flex; gap:18px; align-items:center; justify-content:center; padding:14px 10px; background:#fff; border-bottom:1px solid #e7e7e7; position:sticky; top:0}
+    nav{display:flex; gap:18px; align-items:center; justify-content:center; padding:14px 10px; background:#fff; border-bottom:1px solid #e7e7e7; position:sticky; top:0; z-index:10}
     nav a{text-decoration:none; color:var(--text); font-weight:600}
     nav a:hover{text-decoration:underline}
     /* PAGE */
     img{width:200px; margin-top:30px; margin-bottom:20px}
     h1{margin-top:10px; color:var(--text)}
     p{color:var(--muted); font-size:18px}
-    button{margin-top:20px; padding:10px 20px; font-size:16px; cursor:pointer; border:none; background:var(--brand); color:#fff; border-radius:5px}
-    button:hover{background:#005fa3}
     footer{margin:40px 0 30px; font-size:14px; color:#777}
-    /* FORM */
-    .card{max-width:720px; margin:30px auto; background:#fff; border-radius:10px; padding:22px; box-shadow:0 2px 10px rgba(0,0,0,.06); text-align:left}
+    /* BUTTONS */
+    .btn{display:inline-block; margin-top:12px; padding:10px 16px; font-size:16px; cursor:pointer; border:none; border-radius:6px; color:#fff; background:var(--brand)}
+    .btn:hover{background:#005fa3}
+    .btn-danger{background:var(--danger)}
+    .btn-danger:hover{background:#9e1f1f}
+    /* CARDS / FORM */
+    .card{max-width:760px; margin:30px auto; background:#fff; border-radius:10px; padding:22px; box-shadow:0 2px 10px rgba(0,0,0,.06); text-align:left}
     label{display:block; margin:12px 0 6px; font-weight:600; color:var(--text)}
     input, textarea, select{width:100%; padding:10px; font-size:16px; border:1px solid #ccc; border-radius:6px}
+    /* ENTRIES */
     .entries{margin-top:24px}
-    .entry{padding:14px; border:1px solid #eee; border-radius:8px; margin-bottom:12px; background:#fafafa}
+    .entry{padding:14px; border:1px solid #eee; border-radius:10px; margin-bottom:12px; background:#fafafa; display:flex; align-items:flex-start; justify-content:space-between; gap:12px}
+    .entry-main{max-width:80%}
     .entry h3{margin:0 0 6px; color:var(--brand)}
     .entry p{margin:4px 0; color:var(--muted)}
+    .entry .meta{font-size:13px; color:#888}
+    .entry .actions{display:flex; gap:8px}
+    .empty{color:#888; font-style:italic; text-align:center; padding:12px 0}
   </style>
 </head>
 <body>
@@ -61,37 +69,88 @@
         <option value="5">⭐⭐⭐⭐⭐ 5</option>
       </select>
 
-      <button type="submit">Submit</button>
+      <button type="submit" class="btn">Submit</button>
     </form>
   </div>
 
   <!-- List of entries -->
   <div class="card entries" id="entries">
-    <h2>Recent Submissions</h2>
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+      <h2 style="margin:0;">Recent Submissions</h2>
+      <button id="clear-all" class="btn btn-danger" title="Remove all saved submissions">Clear all</button>
+    </div>
     <div id="entries-list"></div>
   </div>
 
   <footer>© 2025 Try It App</footer>
 
   <script>
-    const form = document.getElementById('tryit-form');
+    // ====== Storage helpers ======
+    const LS_KEY = 'tryit_entries';
     const entriesList = document.getElementById('entries-list');
-    let entries = JSON.parse(localStorage.getItem('tryit_entries')) || [];
+    const form = document.getElementById('tryit-form');
+    const clearBtn = document.getElementById('clear-all');
 
+    let entries = JSON.parse(localStorage.getItem(LS_KEY)) || [];
+
+    function save() {
+      localStorage.setItem(LS_KEY, JSON.stringify(entries));
+    }
+
+    function formatDate(ts){
+      const d = new Date(ts);
+      // Show local date/time briefly
+      return d.toLocaleString();
+    }
+
+    // ====== Render ======
     function renderEntries() {
       entriesList.innerHTML = '';
+      if (entries.length === 0) {
+        entriesList.innerHTML = '<div class="empty">No submissions yet — be the first!</div>';
+        return;
+      }
+
       entries.forEach((e, i) => {
         const div = document.createElement('div');
         div.className = 'entry';
         div.innerHTML = `
-          <h3>${e.title}</h3>
-          <p>${e.desc}</p>
-          <p>Rating: ${'⭐'.repeat(e.rating)}</p>
+          <div class="entry-main">
+            <h3>${escapeHTML(e.title)}</h3>
+            <p>${escapeHTML(e.desc)}</p>
+            <p>Rating: ${'⭐'.repeat(e.rating)}</p>
+            <div class="meta">Saved: ${formatDate(e.ts)}</div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-danger" data-index="${i}" aria-label="Delete entry ${i+1}">Delete</button>
+          </div>
         `;
         entriesList.appendChild(div);
       });
+
+      // Attach delete handlers
+      document.querySelectorAll('.actions .btn-danger').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+          const idx = Number(ev.currentTarget.getAttribute('data-index'));
+          if (!Number.isInteger(idx)) return;
+          entries.splice(idx, 1);
+          save();
+          renderEntries();
+        });
+      });
     }
 
+    // Basic HTML escaping to avoid injecting tags
+    function escapeHTML(str){
+      return String(str)
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'","&#39;");
+    }
+
+    // ====== Form submit ======
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();
       const title = document.getElementById('title').value.trim();
@@ -100,15 +159,27 @@
 
       if (!title || !desc || !rating) return;
 
-      const newEntry = { title, desc, rating };
-      entries.unshift(newEntry); // add to top
-      localStorage.setItem('tryit_entries', JSON.stringify(entries));
-
+      const newEntry = { title, desc, rating, ts: Date.now() };
+      entries.unshift(newEntry);           // newest first
+      save();
       form.reset();
       renderEntries();
+      // optional toast
+      alert('Submitted! 🎉');
     });
 
-    // Render existing on load
+    // ====== Clear all ======
+    clearBtn.addEventListener('click', () => {
+      if (!entries.length) return alert('Nothing to clear.');
+      const ok = confirm('Clear all submissions? This cannot be undone.');
+      if (!ok) return;
+      entries = [];
+      save();
+      renderEntries();
+      alert('All submissions cleared.');
+    });
+
+    // Initial render
     renderEntries();
   </script>
 </body>
