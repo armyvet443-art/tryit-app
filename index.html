@@ -17,16 +17,25 @@
     p{color:var(--muted); font-size:18px}
     button{margin-top:20px; padding:10px 20px; font-size:16px; cursor:pointer; border:none; background:var(--brand); color:#fff; border-radius:5px}
     button:hover{background:#005fa3}
-    footer{margin-top:40px; font-size:14px; color:#777; padding-bottom:30px}
+    footer{margin:40px 0 30px; font-size:14px; color:#777}
+
+    /* RATING WIDGET */
+    .card{max-width:720px; margin:30px auto; background:#fff; border-radius:10px; padding:22px; box-shadow:0 2px 10px rgba(0,0,0,.06)}
+    .stars{display:flex; justify-content:center; gap:10px; font-size:36px; cursor:pointer; user-select:none}
+    .star{filter: grayscale(1); transition: transform .1s ease}
+    .star.active{filter:none}
+    .star:hover{transform: scale(1.1)}
+    .rating-note{margin-top:12px; color:var(--muted)}
+    .result{margin-top:14px; font-weight:700; color:var(--text)}
   </style>
 </head>
 <body>
-  <!-- Logo you uploaded earlier -->
+  <!-- Logo -->
   <img src="logo_resized2.jpg" alt="Try It App Logo">
 
-  <!-- Simple top navigation -->
+  <!-- Navigation -->
   <nav>
-    <a href="index.html">Home</a>
+    <a href="index.html"><strong>Home</strong></a>
     <a href="about.html">About</a>
     <a href="contact.html">Contact</a>
   </nav>
@@ -37,6 +46,51 @@
 
   <button onclick="alert('Thanks for trying the Try It App 🚀')">Click Me</button>
 
+  <!-- ★ STAR RATING DEMO -->
+  <div class="card" id="rating-card">
+    <h2>Rate this demo</h2>
+    <div class="stars" id="stars">
+      <!-- We’re using Unicode stars so no images needed -->
+      <span class="star" data-value="1">★</span>
+      <span class="star" data-value="2">★</span>
+      <span class="star" data-value="3">★</span>
+      <span class="star" data-value="4">★</span>
+      <span class="star" data-value="5">★</span>
+    </div>
+    <div class="rating-note">Tap a star from 1–5</div>
+    <div class="result" id="rating-result"></div>
+  </div>
+
   <footer>© 2025 Try It App</footer>
+
+  <script>
+    // Simple front-end star rating with localStorage
+    const stars = document.querySelectorAll('.star');
+    const result = document.getElementById('rating-result');
+    const saved = localStorage.getItem('tryit_demo_rating');
+    let current = saved ? Number(saved) : 0;
+
+    function paint(value){
+      stars.forEach(star=>{
+        const v = Number(star.dataset.value);
+        if (v <= value) star.classList.add('active');
+        else star.classList.remove('active');
+      });
+      result.textContent = value ? `You rated this ${value} / 5 ⭐` : '';
+    }
+
+    // initial paint
+    paint(current);
+
+    stars.forEach(star=>{
+      star.addEventListener('mouseenter', ()=> paint(Number(star.dataset.value)));
+      star.addEventListener('mouseleave', ()=> paint(current));
+      star.addEventListener('click', ()=>{
+        current = Number(star.dataset.value);
+        localStorage.setItem('tryit_demo_rating', String(current));
+        paint(current);
+      });
+    });
+  </script>
 </body>
 </html>
