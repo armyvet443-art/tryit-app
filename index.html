@@ -1,59 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Try It App 🚀</title>
-  <style>
-    :root {
-      --brand:#0078d7; --text:#333; --muted:#555; --bg:#f4f4f4; --danger:#c62828;
-    }
-    body{font-family:Arial, sans-serif; text-align:center; margin:0; padding:0; background:var(--bg);}
-    /* NAV */
-    nav{display:flex; gap:18px; align-items:center; justify-content:center; padding:14px 10px; background:#fff; border-bottom:1px solid #e7e7e7; position:sticky; top:0; z-index:10}
-    nav a{text-decoration:none; color:var(--text); font-weight:600}
-    nav a:hover{text-decoration:underline}
-    /* PAGE */
-    img{width:200px; margin-top:30px; margin-bottom:20px}
-    h1{margin-top:10px; color:var(--text)}
-    p{color:var(--muted); font-size:18px}
-    footer{margin:40px 0 30px; font-size:14px; color:#777}
-    /* BUTTONS */
-    .btn{display:inline-block; margin-top:12px; padding:10px 16px; font-size:16px; cursor:pointer; border:none; border-radius:6px; color:#fff; background:var(--brand)}
-    .btn:hover{background:#005fa3}
-    .btn-danger{background:var(--danger)}
-    .btn-danger:hover{background:#9e1f1f}
-    /* CARDS / FORM */
-    .card{max-width:900px; margin:30px auto; background:#fff; border-radius:10px; padding:22px; box-shadow:0 2px 10px rgba(0,0,0,.06); text-align:left}
-    label{display:block; margin:12px 0 6px; font-weight:600; color:var(--text)}
-    input, textarea, select{width:100%; padding:10px; font-size:16px; border:1px solid #ccc; border-radius:6px}
-    .row{display:grid; grid-template-columns:1fr 1fr; gap:12px}
-    @media (max-width:700px){ .row{grid-template-columns:1fr;} }
-    /* ENTRIES */
-    .entries{margin-top:24px}
-    .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between}
-    .filters{display:flex; gap:10px; flex-wrap:wrap}
-    .filters input[type="search"], .filters select{padding:10px; border:1px solid #ccc; border-radius:6px; font-size:16px}
-    .entry{padding:14px; border:1px solid #eee; border-radius:10px; margin-bottom:12px; background:#fafafa; display:flex; align-items:flex-start; justify-content:space-between; gap:12px}
-    .entry-main{max-width:80%}
-    .entry h3{margin:0 0 6px; color:var(--brand)}
-    .entry p{margin:4px 0; color:var(--muted)}
-    .entry .meta{font-size:13px; color:#888}
-    .entry .actions{display:flex; gap:8px}
-    .empty{color:#888; font-style:italic; text-align:center; padding:12px 0}
-    .badge{display:inline-block; background:#eaf3ff; color:#155fa0; border:1px solid #cfe3ff; padding:2px 8px; border-radius:999px; font-size:12px; margin-left:6px}
-  </style>
+  <link rel="stylesheet" href="style.css?v=1">
+  <script src="app.js?v=1" defer></script>
 </head>
 <body>
-  <!-- Logo -->
-  <img src="logo_resized2.jpg" alt="Try It App Logo">
-
-  <!-- Navigation -->
-  <nav>
-    <a href="index.html"><strong>Home</strong></a>
-    <a href="about.html">About</a>
-    <a href="contact.html">Contact</a>
-  </nav>
+  <!-- Shared header will be injected here -->
+  <header id="site-header"></header>
 
   <h1>Try It App 🚀</h1>
   <p>Share what you tried and rate it!</p>
@@ -64,7 +20,7 @@
       <div class="row">
         <div>
           <label for="title">Title</label>
-          <input type="text" id="title" name="title" placeholder="e.g. New restaurant" required>
+          <input type="text" id="title" name="title" required>
         </div>
         <div>
           <label for="category">Category</label>
@@ -77,9 +33,8 @@
           </select>
         </div>
       </div>
-
       <label for="desc">Description</label>
-      <textarea id="desc" name="desc" rows="3" placeholder="What was your experience?" required></textarea>
+      <textarea id="desc" name="desc" rows="3" required></textarea>
 
       <label for="rating">Rating</label>
       <select id="rating" name="rating" required>
@@ -95,154 +50,135 @@
     </form>
   </div>
 
-  <!-- List of entries -->
+  <!-- Filters + Entries -->
   <div class="card entries" id="entries">
     <div class="toolbar">
       <h2 style="margin:0;">Recent Submissions</h2>
       <div class="filters">
-        <input type="search" id="search" placeholder="Search title/description...">
+        <input type="search" id="search" placeholder="Search...">
         <select id="filter-category">
-          <option value="All">All Categories</option>
+          <option value="All">All</option>
           <option value="Food">Food</option>
           <option value="Product">Product</option>
           <option value="Travel">Travel</option>
           <option value="Fitness">Fitness</option>
           <option value="Uncategorized">Uncategorized</option>
         </select>
-        <button id="clear-all" class="btn btn-danger" title="Remove all saved submissions">Clear all</button>
+        <button id="export" class="btn">Export CSV</button>
+        <button id="clear-all" class="btn btn-danger">Clear all</button>
       </div>
     </div>
     <div id="entries-list"></div>
   </div>
 
-  <footer>© 2025 Try It App</footer>
+  <!-- Shared footer will be injected here -->
+  <footer id="site-footer"></footer>
 
   <script>
-    // ====== Storage helpers ======
+    // ====== Same app logic as before (entries + filters + edit + export) ======
     const LS_KEY = 'tryit_entries';
-    const entriesList = document.getElementById('entries-list');
-    const form = document.getElementById('tryit-form');
-    const clearBtn = document.getElementById('clear-all');
-
-    // Filters
-    const searchInput = document.getElementById('search');
-    const filterCategory = document.getElementById('filter-category');
-
     let entries = JSON.parse(localStorage.getItem(LS_KEY)) || [];
 
-    // Migrate old entries (without category) to "Uncategorized"
+    // HTML refs
+    const entriesList = document.getElementById('entries-list');
+    const form = document.getElementById('tryit-form');
+    const searchInput = document.getElementById('search');
+    const filterCategory = document.getElementById('filter-category');
+    const clearBtn = document.getElementById('clear-all');
+    const exportBtn = document.getElementById('export');
+
+    // Migrate old entries without category
     let migrated = false;
-    entries = entries.map(e => {
-      if (!e.category) { migrated = true; return {...e, category: 'Uncategorized'}; }
-      return e;
-    });
+    entries = entries.map(e => (!e.category ? (migrated = true, {...e, category:'Uncategorized'}) : e));
     if (migrated) localStorage.setItem(LS_KEY, JSON.stringify(entries));
 
-    function save() {
-      localStorage.setItem(LS_KEY, JSON.stringify(entries));
-    }
+    function save(){ localStorage.setItem(LS_KEY, JSON.stringify(entries)); }
+    function escapeHTML(str){return String(str).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
-    function formatDate(ts){
-      const d = new Date(ts);
-      return d.toLocaleString();
-    }
-
-    // ====== Rendering with filters ======
-    function getFilteredEntries() {
+    function getFilteredEntries(){
       const q = searchInput.value.trim().toLowerCase();
       const cat = filterCategory.value;
-
-      return entries.filter(e => {
-        const matchesCat = (cat === 'All') ? true : (e.category === cat);
-        const hay = (e.title + ' ' + e.desc).toLowerCase();
-        const matchesSearch = q ? hay.includes(q) : true;
-        return matchesCat && matchesSearch;
+      return entries.filter(e=>{
+        const matchCat = (cat==='All') ? true : (e.category===cat);
+        const text = (e.title+' '+e.desc).toLowerCase();
+        return matchCat && (!q || text.includes(q));
       });
     }
 
-    function renderEntries() {
+    function renderEntries(){
       const list = getFilteredEntries();
-      entriesList.innerHTML = '';
-      if (list.length === 0) {
-        entriesList.innerHTML = '<div class="empty">No submissions match your filters.</div>';
-        return;
-      }
+      entriesList.innerHTML='';
+      if(!list.length){ entriesList.innerHTML='<div class="empty">No submissions match filters.</div>'; return; }
 
-      list.forEach((e, i) => {
-        const div = document.createElement('div');
-        div.className = 'entry';
-        div.innerHTML = `
+      list.forEach(e=>{
+        const div=document.createElement('div');
+        div.className='entry';
+        div.innerHTML=`
           <div class="entry-main">
-            <h3>${escapeHTML(e.title)} <span class="badge">${escapeHTML(e.category)}</span></h3>
-            <p>${escapeHTML(e.desc)}</p>
-            <p>Rating: ${'⭐'.repeat(e.rating)}</p>
-            <div class="meta">Saved: ${formatDate(e.ts)}</div>
+            <h3 contenteditable="true" class="editable" data-field="title">${escapeHTML(e.title)}</h3>
+            <p contenteditable="true" class="editable" data-field="desc">${escapeHTML(e.desc)}</p>
+            <p>Rating: <span contenteditable="true" class="editable" data-field="rating">${e.rating}</span> ⭐</p>
+            <p>Category: <span contenteditable="true" class="editable" data-field="category">${escapeHTML(e.category)}</span></p>
+            <div class="meta">Saved: ${new Date(e.ts).toLocaleString()}</div>
           </div>
           <div class="actions">
-            <button class="btn btn-danger" data-id="${e.ts}" aria-label="Delete entry">Delete</button>
-          </div>
-        `;
+            <button class="btn btn-danger" data-id="${e.ts}">Delete</button>
+          </div>`;
         entriesList.appendChild(div);
       });
 
-      // Attach delete handlers (by timestamp id)
-      document.querySelectorAll('.actions .btn-danger').forEach(btn => {
-        btn.addEventListener('click', (ev) => {
-          const id = Number(ev.currentTarget.getAttribute('data-id'));
-          const idx = entries.findIndex(x => x.ts === id);
-          if (idx >= 0) {
-            entries.splice(idx, 1);
+      // delete
+      document.querySelectorAll('.actions .btn-danger').forEach(btn=>{
+        btn.onclick=(ev)=>{
+          const id=Number(ev.target.dataset.id);
+          entries=entries.filter(x=>x.ts!==id);
+          save(); renderEntries();
+        }
+      });
+
+      // inline edit
+      document.querySelectorAll('.editable').forEach(el=>{
+        el.onblur=()=>{
+          const field=el.dataset.field;
+          const parentId=el.closest('.entry').querySelector('.btn-danger').dataset.id;
+          const idx=entries.findIndex(x=>x.ts==parentId);
+          if(idx>=0){
+            let val=el.innerText.trim();
+            if(field==='rating') val=Number(val)||1;
+            entries[idx][field]=val;
             save();
-            renderEntries();
           }
-        });
+        }
       });
     }
 
-    // Basic HTML escaping
-    function escapeHTML(str){
-      return String(str)
-        .replaceAll('&','&amp;')
-        .replaceAll('<','&lt;')
-        .replaceAll('>','&gt;')
-        .replaceAll('"','&quot;')
-        .replaceAll("'","&#39;");
-    }
-
-    // ====== Form submit ======
-    form.addEventListener('submit', (ev) => {
+    // submit
+    form.onsubmit=(ev)=>{
       ev.preventDefault();
-      const title = document.getElementById('title').value.trim();
-      const desc = document.getElementById('desc').value.trim();
-      const rating = Number(document.getElementById('rating').value);
-      const category = document.getElementById('category').value;
+      const title=document.getElementById('title').value.trim();
+      const desc=document.getElementById('desc').value.trim();
+      const rating=Number(document.getElementById('rating').value);
+      const category=document.getElementById('category').value;
+      if(!title||!desc||!rating||!category) return;
+      const newEntry={title,desc,rating,category,ts:Date.now()};
+      entries.unshift(newEntry); save(); form.reset(); renderEntries();
+    };
 
-      if (!title || !desc || !rating || !category) return;
+    // clear/search/filter/export
+    clearBtn.onclick=()=>{ if(entries.length && confirm('Clear all?')){ entries=[]; save(); renderEntries(); } };
+    searchInput.oninput=renderEntries;
+    filterCategory.onchange=renderEntries;
+    exportBtn.onclick=()=>{
+      if(!entries.length) return alert('Nothing to export.');
+      let csv='Title,Description,Rating,Category,Timestamp\n';
+      entries.forEach(e=>{
+        csv+=`"${e.title.replace(/"/g,'""')}","${e.desc.replace(/"/g,'""')}",${e.rating},${e.category},${new Date(e.ts).toISOString()}\n`;
+      });
+      const blob=new Blob([csv],{type:'text/csv'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download='tryit_entries.csv'; a.click(); URL.revokeObjectURL(url);
+    };
 
-      const newEntry = { title, desc, rating, category, ts: Date.now() };
-      entries.unshift(newEntry); // newest first
-      save();
-      form.reset();
-      renderEntries();
-      alert('Submitted! 🎉');
-    });
-
-    // ====== Clear all ======
-    clearBtn.addEventListener('click', () => {
-      if (!entries.length) return alert('Nothing to clear.');
-      const ok = confirm('Clear all submissions? This cannot be undone.');
-      if (!ok) return;
-      entries = [];
-      save();
-      renderEntries();
-      alert('All submissions cleared.');
-    });
-
-    // ====== Filter events ======
-    searchInput.addEventListener('input', renderEntries);
-    filterCategory.addEventListener('change', renderEntries);
-
-    // Initial render
     renderEntries();
   </script>
 </body>
