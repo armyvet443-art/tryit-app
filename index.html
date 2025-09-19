@@ -5,48 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Try It App 🚀</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 0;
-      background-color: #f4f4f4;
-    }
-    h1 {
-      margin-top: 20px;
-      color: #333;
-    }
-    p {
-      color: #555;
-      font-size: 18px;
-    }
-    img {
-      width: 200px;   /* Adjust the logo size as needed */
-      margin-top: 30px;
-      margin-bottom: 20px;
-    }
-    button {
-      margin-top: 20px;
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-      border: none;
-      background-color: #0078d7;
-      color: white;
-      border-radius: 5px;
-    }
-    button:hover {
-      background-color: #005fa3;
-    }
-    footer {
-      margin-top: 40px;
-      font-size: 14px;
-      color: #777;
-    }
+    :root { --brand:#0078d7; --text:#333; --muted:#555; --bg:#f4f4f4; }
+    body{font-family:Arial, sans-serif; text-align:center; margin:0; padding:0; background:var(--bg);}
+    /* NAV */
+    nav{display:flex; gap:18px; align-items:center; justify-content:center; padding:14px 10px; background:#fff; border-bottom:1px solid #e7e7e7; position:sticky; top:0}
+    nav a{text-decoration:none; color:var(--text); font-weight:600}
+    nav a:hover{text-decoration:underline}
+    /* PAGE */
+    img{width:200px; margin-top:30px; margin-bottom:20px}
+    h1{margin-top:10px; color:var(--text)}
+    p{color:var(--muted); font-size:18px}
+    button{margin-top:20px; padding:10px 20px; font-size:16px; cursor:pointer; border:none; background:var(--brand); color:#fff; border-radius:5px}
+    button:hover{background:#005fa3}
+    footer{margin-top:40px; font-size:14px; color:#777; padding-bottom:30px}
   </style>
 </head>
 <body>
+  <!-- Logo you uploaded earlier -->
   <img src="logo_resized2.jpg" alt="Try It App Logo">
+
+  <!-- Simple top navigation -->
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="about.html">About</a>
+    <a href="contact.html">Contact</a>
+  </nav>
 
   <h1>Try It App 🚀</h1>
   <p>Hello World! This is my first Azure site.</p>
@@ -54,8 +37,6 @@
 
   <button onclick="alert('Thanks for trying the Try It App 🚀')">Click Me</button>
 
-  <footer>
-    © 2025 Try It App
-  </footer>
+  <footer>© 2025 Try It App</footer>
 </body>
 </html>
