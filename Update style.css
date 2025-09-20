@@ -45,3 +45,12 @@ body.dark .badge{background:#333; color:#eee; border-color:#555}
   width: 50%;         /* scales down on small screens */
   height: auto;       /* keeps proportions */
 }
+
+/* Responsive logo styling */
+.app-logo {
+  display: block;
+  margin: 20px auto;
+  max-width: 200px;   /* never bigger than 200px */
+  width: 50%;         /* scales down on small screens */
+  height: auto;       /* keeps proportions */
+}
