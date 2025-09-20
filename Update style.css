@@ -159,3 +159,74 @@ button:hover,
 @media (max-width: 360px) {
   .app-logo { width: 70%; max-width: 160px; }
 }
+/* ===== Entry Cards ===== */
+.entry-card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 14px;
+  margin: 10px 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.entry-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #222;
+  margin-right: auto;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: #eef5ff;
+  color: #0b63c4;
+  white-space: nowrap;
+}
+
+.entry-desc {
+  color: #444;
+  margin: 6px 0 10px;
+  white-space: pre-wrap;
+}
+
+.entry-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stars {
+  font-size: 1.05rem;
+  letter-spacing: 1px;
+}
+
+.meta {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+/* Category color accents (optional) */
+.badge.food { background: #fff6e6; color: #b35a00; }
+.badge.product { background: #eafaf1; color: #1a7f4b; }
+.badge.travel { background: #e6f7ff; color: #0b63c4; }
+.badge.fitness { background: #f6e6ff; color: #6f2dbd; }
+.badge.uncategorized { background: #f2f2f2; color: #555; }
+
+/* Make entry cards breathe on phones */
+@media (max-width: 600px) {
+  .entry-card { padding: 12px; }
+}
