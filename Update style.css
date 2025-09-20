@@ -1,49 +1,78 @@
-:root {
-  --brand:#0078d7; --text:#333; --muted:#555; --bg:#f4f4f4; --danger:#c62828; --card-bg:#fff;
+/* Reset some default browser styles */
+body, h1, h2, h3, p, ul, li, form {
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
 }
-body{font-family:Arial, sans-serif; text-align:center; margin:0; padding:0; background:var(--bg); color:var(--text); transition: background .3s, color .3s;}
-nav{display:flex; gap:18px; align-items:center; justify-content:center; padding:14px 10px; background:#fff; border-bottom:1px solid #e7e7e7; position:sticky; top:0; z-index:10}
-nav a{text-decoration:none; color:var(--text); font-weight:600}
-nav a:hover{text-decoration:underline}
-img{width:200px; margin-top:30px; margin-bottom:20px}
-h1{margin-top:10px}
-p{color:var(--muted); font-size:18px}
-footer{margin:40px 0 30px; font-size:14px; color:#777}
-.btn{display:inline-block; margin-top:12px; padding:10px 16px; font-size:16px; cursor:pointer; border:none; border-radius:6px; color:#fff; background:var(--brand)}
-.btn:hover{background:#005fa3}
-.btn-danger{background:var(--danger)}
-.btn-danger:hover{background:#9e1f1f}
-.card{max-width:900px; margin:30px auto; background:var(--card-bg); border-radius:10px; padding:22px; box-shadow:0 2px 10px rgba(0,0,0,.06); text-align:left}
-label{display:block; margin:12px 0 6px; font-weight:600}
-input, textarea, select{width:100%; padding:10px; font-size:16px; border:1px solid #ccc; border-radius:6px}
-.row{display:grid; grid-template-columns:1fr 1fr; gap:12px}
-@media (max-width:700px){ .row{grid-template-columns:1fr;} }
-.entries{margin-top:24px}
-.toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between}
-.filters{display:flex; gap:10px; flex-wrap:wrap}
-.filters input[type="search"], .filters select{padding:10px; border:1px solid #ccc; border-radius:6px; font-size:16px}
-.entry{padding:14px; border:1px solid #eee; border-radius:10px; margin-bottom:12px; background:#fafafa; display:flex; align-items:flex-start; justify-content:space-between; gap:12px}
-.entry-main{max-width:80%}
-.entry h3{margin:0 0 6px; color:var(--brand)}
-.entry p{margin:4px 0; color:var(--muted)}
-.entry .meta{font-size:13px; color:#888}
-.entry .actions{display:flex; gap:8px}
-.empty{color:#888; font-style:italic; text-align:center; padding:12px 0}
-.badge{display:inline-block; background:#eaf3ff; color:#155fa0; border:1px solid #cfe3ff; padding:2px 8px; border-radius:999px; font-size:12px; margin-left:6px}
 
-/* Dark mode */
-body.dark { --bg:#1e1e1e; --text:#e4e4e4; --muted:#aaa; --card-bg:#2a2a2a; }
-body.dark nav{background:#2c2c2c; border-color:#444}
-body.dark .entry{background:#333; border-color:#444}
-body.dark .badge{background:#333; color:#eee; border-color:#555}
+/* Basic body styling */
+body {
+  background-color: #f9f9f9;
+  color: #333;
+  line-height: 1.6;
+  padding: 10px;
+}
 
-/* Responsive logo styling */
-.app-logo {
-  display: block;
+/* Card container */
+.card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
   margin: 20px auto;
-  max-width: 200px;   /* never bigger than 200px */
-  width: 50%;         /* scales down on small screens */
-  height: auto;       /* keeps proportions */
+  padding: 20px;
+  max-width: 600px;
+}
+
+/* Form inputs */
+input[type="text"],
+textarea,
+select {
+  width: 100%;
+  padding: 8px;
+  margin: 8px 0 16px 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* Buttons */
+button,
+.btn {
+  background-color: #0078d7;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  margin: 4px 2px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover,
+.btn:hover {
+  background-color: #005a9e;
+}
+
+.btn-danger {
+  background-color: #d9534f;
+}
+
+.btn-danger:hover {
+  background-color: #c9302c;
+}
+
+/* Toolbar styling */
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+/* Filters section */
+.filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 /* Responsive logo styling */
