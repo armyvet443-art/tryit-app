@@ -1,0 +1,232 @@
+/* ========== Base Reset ========== */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body, h1, h2, h3, p, ul, li, form { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; }
+
+/* ========== Body ========== */
+body {
+  background-color: #f9f9f9;
+  color: #333;
+  line-height: 1.6;
+  padding: 12px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prevent layout shift on iOS when focusing inputs */
+input, select, textarea, button { font-size: 16px; }
+
+/* ========== Cards ========== */
+.card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  margin: 16px auto;
+  padding: 16px;
+  max-width: 720px;
+}
+
+/* ========== Headings ========== */
+h1 {
+  text-align: center;
+  margin: 8px 0 6px;
+  font-size: 1.8rem;
+}
+h2 { font-size: 1.2rem; }
+
+/* ========== Logo ========== */
+.app-logo {
+  display: block;
+  margin: 20px auto 8px;
+  max-width: 200px;   /* never bigger than 200px */
+  width: 50%;         /* scales down on small screens */
+  height: auto;       /* keeps proportions */
+}
+
+/* ========== Form ========== */
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+label { display: block; font-weight: 600; margin-bottom: 6px; }
+
+input[type="text"],
+textarea,
+select {
+  width: 100%;
+  padding: 10px 12px;
+  margin: 0 0 14px 0;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  background: #fff;
+}
+
+textarea { resize: vertical; }
+
+/* Buttons */
+button,
+.btn {
+  background-color: #0078d7;
+  color: #fff;
+  border: none;
+  padding: 12px 16px;
+  margin: 6px 4px 0 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color .15s ease;
+  touch-action: manipulation;
+}
+button:hover,
+.btn:hover { background-color: #005a9e; }
+
+.btn-danger { background-color: #d9534f; }
+.btn-danger:hover { background-color: #c9302c; }
+
+/* ========== Toolbar / Filters ========== */
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filters input[type="search"] {
+  min-width: 180px;
+  flex: 1 1 180px;
+}
+
+#filter-category { flex: 0 0 160px; }
+
+/* Entries list container */
+.entries #entries-list { padding: 8px 0; }
+
+/* ========== Footer ========== */
+#site-footer { text-align: center; color: #666; padding: 20px 0; }
+
+/* ========== Mobile Tweaks ========== */
+@media (max-width: 600px) {
+  body { padding: 10px; }
+
+  /* Logo a bit smaller on narrow screens */
+  .app-logo { width: 60%; max-width: 180px; }
+
+  /* Stack the two inputs (Title / Category) on top of each other */
+  .row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  /* Make filters stack nicely */
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .filters input[type="search"],
+  .filters select,
+  .filters .btn {
+    width: 100%;
+  }
+
+  /* Buttons full-width for easier taps */
+  .btn,
+  button {
+    width: 100%;
+  }
+
+  /* Cards tighter padding on mobile */
+  .card { padding: 14px; margin: 14px auto; }
+
+  h1 { font-size: 1.6rem; }
+}
+
+/* ========== Tiny screens (older iPhones in zoom) ========== */
+@media (max-width: 360px) {
+  .app-logo { width: 70%; max-width: 160px; }
+}
+/* ===== Entry Cards ===== */
+.entry-card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 14px;
+  margin: 10px 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.entry-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #222;
+  margin-right: auto;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: #eef5ff;
+  color: #0b63c4;
+  white-space: nowrap;
+}
+
+.entry-desc {
+  color: #444;
+  margin: 6px 0 10px;
+  white-space: pre-wrap;
+}
+
+.entry-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stars {
+  font-size: 1.05rem;
+  letter-spacing: 1px;
+}
+
+.meta {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+/* Category color accents (optional) */
+.badge.food { background: #fff6e6; color: #b35a00; }
+.badge.product { background: #eafaf1; color: #1a7f4b; }
+.badge.travel { background: #e6f7ff; color: #0b63c4; }
+.badge.fitness { background: #f6e6ff; color: #6f2dbd; }
+.badge.uncategorized { background: #f2f2f2; color: #555; }
+
+/* Make entry cards breathe on phones */
+@media (max-width: 600px) {
+  .entry-card { padding: 12px; }
+}

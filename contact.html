@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Contact • Try It App</title>
+  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="icon" href="logo_resized2.jpg">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0078d7">
+  <script src="app.js?v=1" defer></script>
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <div class="card" style="max-width:900px;">
+    <h1 style="text-align:left;">Contact</h1>
+    <form id="contact-form">
+      <label for="name">Your name</label>
+      <input id="name" name="name" type="text" required>
+
+      <label for="email">Your email</label>
+      <input id="email" name="email" type="email" required>
+
+      <label for="message">Message</label>
+      <textarea id="message" name="message" rows="5" required></textarea>
+
+      <button class="btn" type="submit">Send</button>
+    </form>
+  </div>
+
+  <footer id="site-footer"></footer>
+
+  <script>
+    document.getElementById('contact-form').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      alert('Thanks! Your message was recorded locally for demo purposes.');
+      e.target.reset();
+    });
+  </script>
+</body>
+</html>

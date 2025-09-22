@@ -1,20 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TryIt App</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Try It App 🚀</title>
+
+  <!-- Favicons for browsers -->
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="favicon-512.png">
+
+  <!-- Android / PWA -->
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+
+  <!-- Apple Touch Icon -->
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+  <!-- Default logo -->
+  <link rel="icon" href="logo.png">
+
+  <!-- Theme color for mobile -->
+  <meta name="theme-color" content="#0078d7">
+
+  <!-- CSS & JS -->
+  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <script src="app.js?v=1" defer></script>
+  <script src="script.js" defer></script>
 </head>
 <body>
-  <h1>Welcome to TryIt App 🎉</h1>
+  <header id="site-header"></header>
 
-  <!-- Buttons that match script.js -->
+  <!-- Logo + Title Inline -->
+  <h1>
+    <img src="logo.png" alt="Try It App Logo" style="height:40px; vertical-align:middle; margin-right:8px;">
+    Try It App 🚀
+  </h1>
+  <p>Share what you tried and rate it!</p>
+
+  <!-- Your Fun Buttons -->
   <button id="funButton">Click Me 🚀</button>
   <button id="colorButton">Change Color 🎨</button>
   <button id="greetButton">Say Hi 👋</button>
   <button id="darkModeButton">🌙 Toggle Dark Mode</button>
-
 
   <!-- Input + button for name greeting -->
   <input id="nameInput" type="text" placeholder="Enter your name">
@@ -23,9 +51,64 @@
   <!-- Message output -->
   <p id="message"></p>
   <p id="counter">Clicks: 0</p>
-  
 
+  <!-- Submission Form -->
+  <div class="card">
+    <form id="tryit-form">
+      <div class="row">
+        <div>
+          <label for="title">Title</label>
+          <input type="text" id="title" name="title" required>
+        </div>
+        <div>
+          <label for="category">Category</label>
+          <select id="category" name="category" required>
+            <option value="">-- Select --</option>
+            <option>Food</option>
+            <option>Product</option>
+            <option>Travel</option>
+            <option>Fitness</option>
+          </select>
+        </div>
+      </div>
+      <label for="desc">Description</label>
+      <textarea id="desc" name="desc" rows="3" required></textarea>
 
-  <script src="script.js"></script>
+      <label for="rating">Rating</label>
+      <select id="rating" name="rating" required>
+        <option value="">-- Select --</option>
+        <option value="1">⭐ 1</option>
+        <option value="2">⭐⭐ 2</option>
+        <option value="3">⭐⭐⭐ 3</option>
+        <option value="4">⭐⭐⭐⭐ 4</option>
+        <option value="5">⭐⭐⭐⭐⭐ 5</option>
+      </select>
+
+      <button type="submit" class="btn">Submit</button>
+    </form>
+  </div>
+
+  <!-- Filters + Entries -->
+  <div class="card entries" id="entries">
+    <div class="toolbar">
+      <h2 style="margin:0;">Recent Submissions</h2>
+      <div class="filters">
+        <input type="search" id="search" placeholder="Search...">
+        <select id="filter-category">
+          <option value="All">All</option>
+          <option value="Food">Food</option>
+          <option value="Product">Product</option>
+          <option value="Travel">Travel</option>
+          <option value="Fitness">Fitness</option>
+          <option value="Uncategorized">Uncategorized</option>
+        </select>
+        <button id="export" class="btn">Export CSV</button>
+        <button id="clear-all" class="btn btn-danger">Clear all</button>
+      </div>
+    </div>
+    <div id="entries-list"></div>
+  </div>
+
+  <footer id="site-footer"></footer>
 </body>
 </html>
