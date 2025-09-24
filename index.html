@@ -5,31 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Try It App 🚀</title>
 
-  <!-- Favicons for browsers -->
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="favicon-512.png">
-
-  <!-- Android / PWA -->
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-
-  <!-- Apple Touch Icon -->
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
-
-  <!-- Default logo -->
+  <!-- Favicons -->
   <link rel="icon" href="logo.png">
 
-  <!-- Theme color for mobile -->
+  <!-- Theme color -->
   <meta name="theme-color" content="#0078d7">
 
-  <!-- CSS & Manifest -->
+  <!-- CSS -->
   <link rel="stylesheet" href="style.css?v=1">
-  <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
   <header id="site-header"></header>
 
-  <!-- Logo + Title Inline -->
+  <!-- Logo + Title -->
   <h1>
     <img src="logo.png" alt="Try It App Logo" style="height:40px; vertical-align:middle; margin-right:8px;">
     Try It App 🚀
@@ -50,7 +38,7 @@
   <p id="message"></p>
   <p id="counter">Clicks: 0</p>
 
-  <!-- Authentication Section -->
+  <!-- Auth Card -->
   <div class="card">
     <div id="auth-section">
       <h2>Login / Sign Up</h2>
@@ -62,17 +50,7 @@
       <p id="auth-message"></p>
     </div>
   </div>
-  <hr>
 
-  <!-- Submission Form -->
-  <div class="card">
-    <form id="tryit-form">
-      <div class="row">
-        <div>
-          <label for="title">Title</label>
-          <input type="text" id="title" name="title" required>
-        </div>
-        <div>
-          <label for="category">Category</label>
-          <select id="category" name="category" required>
-            <option value="">-- Select --<
+  <script src="script.js"></script>
+</body>
+</html>
