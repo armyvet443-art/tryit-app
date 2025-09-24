@@ -1,219 +1,184 @@
-// Try It App — minimal client-side logic with localStorage
-// Features: add entries, render as cards, search, filter, export CSV, clear all
+// app.js
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-(function () {
-  const STORAGE_KEY = 'tryit_entries';
+// 🔑 Your Supabase credentials
+const SUPABASE_URL = "https://gyeefhpvsszatylskbbw.supabase.co";
+const SUPABASE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5ZWVmaHB2c3N6YXR5bHNrYmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1NjMwNzAsImV4cCI6MjA3NDEzOTA3MH0.qp3085TxIdB6xGiAI2sgkJT9oubOAn-2IGWrDRNpgqI";
 
-  // --- Elements ---
-  const form = document.getElementById('tryit-form');
-  const titleInput = document.getElementById('title');
-  const categoryInput = document.getElementById('category');
-  const descInput = document.getElementById('desc');
-  const ratingInput = document.getElementById('rating');
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  const entriesList = document.getElementById('entries-list');
-  const searchInput = document.getElementById('search');
-  const filterSelect = document.getElementById('filter-category');
-  const exportBtn = document.getElementById('export');
-  const clearAllBtn = document.getElementById('clear-all');
+document.addEventListener("DOMContentLoaded", async () => {
+  // 🔹 Auth elements
+  const emailInput = document.getElementById("auth-email");
+  const passwordInput = document.getElementById("auth-password");
+  const signupBtn = document.getElementById("signup-button");
+  const loginBtn = document.getElementById("login-button");
+  const logoutBtn = document.getElementById("logout-button");
+  const authMsg = document.getElementById("auth-message");
 
-  // --- State ---
-  let entries = loadEntries();
+  // 🔹 Form + entries
+  const form = document.getElementById("tryit-form");
+  const entriesList = document.getElementById("entries-list");
+  const searchInput = document.getElementById("search");
+  const filterCategory = document.getElementById("filter-category");
+  const clearAllButton = document.getElementById("clear-all");
+  const exportButton = document.getElementById("export");
 
-  // --- Init ---
-  document.addEventListener('DOMContentLoaded', () => {
-    render(entries);
+  let entries = [];
+
+  // --------------------
+  // AUTH HANDLERS
+  // --------------------
+  signupBtn.addEventListener("click", async () => {
+    const { data, error } = await supabase.auth.signUp({
+      email: emailInput.value,
+      password: passwordInput.value,
+    });
+    if (error) {
+      authMsg.textContent = "❌ " + error.message;
+    } else {
+      authMsg.textContent = "✅ Check your email to confirm signup.";
+    }
   });
 
-  // --- Helpers ---
-  function loadEntries() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch (_) {
+  loginBtn.addEventListener("click", async () => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: emailInput.value,
+      password: passwordInput.value,
+    });
+    if (error) {
+      authMsg.textContent = "❌ " + error.message;
+    } else {
+      authMsg.textContent = "✅ Logged in!";
+      logoutBtn.style.display = "inline-block";
+    }
+  });
+
+  logoutBtn.addEventListener("click", async () => {
+    await supabase.auth.signOut();
+    authMsg.textContent = "👋 Logged out!";
+    logoutBtn.style.display = "none";
+  });
+
+  // --------------------
+  // ENTRIES FUNCTIONS
+  // --------------------
+  async function loadEntries() {
+    const { data, error } = await supabase
+      .from("entries")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error loading entries:", error);
       return [];
     }
+    return data;
   }
 
-  function saveEntries() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-  }
-
-  function formatDate(iso) {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleString(undefined, {
-        year: 'numeric', month: 'short', day: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-      });
-    } catch {
-      return iso;
+  async function saveEntry(entry) {
+    const { data, error } = await supabase.from("entries").insert([entry]);
+    if (error) {
+      console.error("Error saving entry:", error);
+      return null;
     }
+    return data[0];
   }
 
-  function makeStars(n) {
-    const count = Number(n) || 0;
-    const filled = '⭐'.repeat(Math.max(0, Math.min(5, count)));
-    const empty = '☆'.repeat(5 - Math.max(0, Math.min(5, count)));
-    return filled + empty;
-  }
-
-  function categoryClass(cat) {
-    const c = (cat || '').toLowerCase();
-    if (c === 'food') return 'food';
-    if (c === 'product') return 'product';
-    if (c === 'travel') return 'travel';
-    if (c === 'fitness') return 'fitness';
-    return 'uncategorized';
-  }
-
-  // --- Rendering ---
-  function render(list) {
-    // Apply filters
-    const term = (searchInput?.value || '').trim().toLowerCase();
-    const cat = (filterSelect?.value || 'All').toLowerCase();
-
-    let view = list.slice().reverse(); // newest first
-    if (cat !== 'all') {
-      view = view.filter(e => (e.category || '').toLowerCase() === cat);
+  function displayEntries(list) {
+    entriesList.innerHTML = "";
+    if (list.length === 0) {
+      entriesList.innerHTML = "<p>No submissions yet. Be the first to try something!</p>";
+      return;
     }
-    if (term) {
-      view = view.filter(e =>
-        (e.title || '').toLowerCase().includes(term) ||
-        (e.desc || '').toLowerCase().includes(term)
-      );
-    }
-
-    // Build HTML
-    entriesList.innerHTML = view.map(e => {
-      const badgeCls = categoryClass(e.category);
-      return `
-        <article class="entry-card" data-id="${e.id}">
-          <div class="entry-header">
-            <div class="entry-title">${escapeHtml(e.title)}</div>
-            <span class="badge ${badgeCls}">
-              ${escapeHtml(e.category || 'Uncategorized')}
-            </span>
-          </div>
-          <div class="entry-desc">${escapeHtml(e.desc)}</div>
-          <div class="entry-footer">
-            <div class="stars" aria-label="${e.rating} stars">${makeStars(e.rating)}</div>
-            <div class="meta">${formatDate(e.createdAt)}</div>
-          </div>
-        </article>`;
-    }).join('');
-
-    // If empty state
-    if (!view.length) {
-      entriesList.innerHTML = `
-        <div class="entry-card" style="text-align:center; color:#666;">
-          No submissions yet. Be the first to try something!
-        </div>`;
-    }
+    list.forEach((entry) => {
+      const div = document.createElement("div");
+      div.className = "entry";
+      div.innerHTML = `
+        <h3>${entry.title} (${entry.category})</h3>
+        <p>${entry.desc}</p>
+        <p>Rating: ${"⭐".repeat(entry.rating)}</p>
+      `;
+      entriesList.appendChild(div);
+    });
   }
 
-  function escapeHtml(str) {
-    return String(str ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
+  // --------------------
+  // FORM HANDLER
+  // --------------------
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-  // --- Events ---
-  if (form) {
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const title = titleInput.value.trim();
-      const category = categoryInput.value || 'Uncategorized';
-      const desc = descInput.value.trim();
-      const rating = ratingInput.value;
+    const title = document.getElementById("title").value.trim();
+    const category = document.getElementById("category").value || "Uncategorized";
+    const desc = document.getElementById("desc").value.trim();
+    const rating = document.getElementById("rating").value;
 
-      if (!title || !desc || !rating) {
-        alert('Please fill Title, Description and Rating.');
-        return;
-      }
+    if (!title || !desc || !rating) return;
 
-      const entry = {
-        id: cryptoRandomId(),
-        title,
-        category,
-        desc,
-        rating: Number(rating),
-        createdAt: new Date().toISOString()
-      };
+    const newEntry = { title, category, desc, rating: Number(rating) };
 
-      entries.push(entry);
-      saveEntries();
+    const saved = await saveEntry(newEntry);
+    if (saved) {
+      entries.unshift(saved);
+      displayEntries(entries);
       form.reset();
-      render(entries);
-      // keep current filters/search; nothing else to do
-    });
-  }
-
-  if (searchInput) {
-    searchInput.addEventListener('input', () => render(entries));
-  }
-
-  if (filterSelect) {
-    filterSelect.addEventListener('change', () => render(entries));
-  }
-
-  if (exportBtn) {
-    exportBtn.addEventListener('click', () => {
-      if (!entries.length) {
-        alert('No entries to export yet.');
-        return;
-      }
-      const csv = toCSV(entries);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'tryit_entries.csv';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
-  }
-
-  if (clearAllBtn) {
-    clearAllBtn.addEventListener('click', () => {
-      if (confirm('Clear all submissions? This cannot be undone.')) {
-        entries = [];
-        saveEntries();
-        render(entries);
-      }
-    });
-  }
-
-  // --- Utils ---
-  function toCSV(list) {
-    const header = ['id','title','category','desc','rating','createdAt'];
-    const rows = list.map(e => [
-      e.id,
-      csvEscape(e.title),
-      csvEscape(e.category),
-      csvEscape(e.desc),
-      e.rating,
-      e.createdAt
-    ]);
-    return [header.join(','), ...rows.map(r => r.join(','))].join('\n');
-  }
-
-  function csvEscape(v) {
-    const s = String(v ?? '');
-    if (s.includes('"') || s.includes(',') || s.includes('\n')) {
-      return `"${s.replace(/"/g, '""')}"`;
     }
-    return s;
-  }
+  });
 
-  function cryptoRandomId() {
-    // Short, URL-safe id
-    const bytes = (self.crypto || window.crypto).getRandomValues(new Uint8Array(8));
-    return Array.from(bytes, b => b.toString(16).padStart(2,'0')).join('');
-  }
-})();
+  // --------------------
+  // FILTERS + ACTIONS
+  // --------------------
+  searchInput.addEventListener("input", () => {
+    const searchTerm = searchInput.value.toLowerCase();
+    const filtered = entries.filter(
+      (entry) =>
+        entry.title.toLowerCase().includes(searchTerm) ||
+        entry.desc.toLowerCase().includes(searchTerm)
+    );
+    displayEntries(filtered);
+  });
+
+  filterCategory.addEventListener("change", () => {
+    const category = filterCategory.value;
+    if (category === "All") {
+      displayEntries(entries);
+    } else {
+      const filtered = entries.filter((entry) => entry.category === category);
+      displayEntries(filtered);
+    }
+  });
+
+  clearAllButton.addEventListener("click", async () => {
+    if (!confirm("Clear ALL submissions? This will wipe the database!")) return;
+    const { error } = await supabase.from("entries").delete().neq("id", "");
+    if (error) {
+      console.error("Error clearing entries:", error);
+      return;
+    }
+    entries = [];
+    displayEntries(entries);
+  });
+
+  exportButton.addEventListener("click", () => {
+    if (entries.length === 0) return;
+    let csv = "Title,Category,Description,Rating\n";
+    entries.forEach((e) => {
+      csv += `"${e.title}","${e.category}","${e.desc}",${e.rating}\n`;
+    });
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "tryit-entries.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // --------------------
+  // INITIALIZE
+  // --------------------
+  entries = await loadEntries();
+  displayEntries(entries);
+});

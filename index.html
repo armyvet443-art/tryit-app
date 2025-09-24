@@ -22,11 +22,9 @@
   <!-- Theme color for mobile -->
   <meta name="theme-color" content="#0078d7">
 
-  <!-- CSS & JS -->
+  <!-- CSS & Manifest -->
   <link rel="stylesheet" href="style.css?v=1">
   <link rel="manifest" href="manifest.webmanifest">
-  <script src="app.js?v=1" defer></script>
-  <script src="script.js" defer></script>
 </head>
 <body>
   <header id="site-header"></header>
@@ -38,7 +36,7 @@
   </h1>
   <p>Share what you tried and rate it!</p>
 
-  <!-- Your Fun Buttons -->
+  <!-- Fun Buttons -->
   <button id="funButton">Click Me 🚀</button>
   <button id="colorButton">Change Color 🎨</button>
   <button id="greetButton">Say Hi 👋</button>
@@ -52,6 +50,20 @@
   <p id="message"></p>
   <p id="counter">Clicks: 0</p>
 
+  <!-- Authentication Section -->
+  <div class="card">
+    <div id="auth-section">
+      <h2>Login / Sign Up</h2>
+      <input type="email" id="auth-email" placeholder="Email" required>
+      <input type="password" id="auth-password" placeholder="Password" required>
+      <button id="signup-button">Sign Up</button>
+      <button id="login-button">Log In</button>
+      <button id="logout-button" style="display:none;">Log Out</button>
+      <p id="auth-message"></p>
+    </div>
+  </div>
+  <hr>
+
   <!-- Submission Form -->
   <div class="card">
     <form id="tryit-form">
@@ -63,52 +75,4 @@
         <div>
           <label for="category">Category</label>
           <select id="category" name="category" required>
-            <option value="">-- Select --</option>
-            <option>Food</option>
-            <option>Product</option>
-            <option>Travel</option>
-            <option>Fitness</option>
-          </select>
-        </div>
-      </div>
-      <label for="desc">Description</label>
-      <textarea id="desc" name="desc" rows="3" required></textarea>
-
-      <label for="rating">Rating</label>
-      <select id="rating" name="rating" required>
-        <option value="">-- Select --</option>
-        <option value="1">⭐ 1</option>
-        <option value="2">⭐⭐ 2</option>
-        <option value="3">⭐⭐⭐ 3</option>
-        <option value="4">⭐⭐⭐⭐ 4</option>
-        <option value="5">⭐⭐⭐⭐⭐ 5</option>
-      </select>
-
-      <button type="submit" class="btn">Submit</button>
-    </form>
-  </div>
-
-  <!-- Filters + Entries -->
-  <div class="card entries" id="entries">
-    <div class="toolbar">
-      <h2 style="margin:0;">Recent Submissions</h2>
-      <div class="filters">
-        <input type="search" id="search" placeholder="Search...">
-        <select id="filter-category">
-          <option value="All">All</option>
-          <option value="Food">Food</option>
-          <option value="Product">Product</option>
-          <option value="Travel">Travel</option>
-          <option value="Fitness">Fitness</option>
-          <option value="Uncategorized">Uncategorized</option>
-        </select>
-        <button id="export" class="btn">Export CSV</button>
-        <button id="clear-all" class="btn btn-danger">Clear all</button>
-      </div>
-    </div>
-    <div id="entries-list"></div>
-  </div>
-
-  <footer id="site-footer"></footer>
-</body>
-</html>
+            <option value="">-- Select --<
