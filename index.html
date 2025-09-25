@@ -2,22 +2,48 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Try It App 🚀</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🚀 Welcome to Try It App</h1>
+    <button id="darkModeToggle">🌙 Toggle Dark Mode</button>
+  </header>
 
-  <!-- Favicons for browsers -->
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="favicon-512.png">
+  <main>
+    <!-- Fun buttons -->
+    <section>
+      <button id="funButton">🎉 Fun Button</button>
+      <button id="colorButton">🎨 Change Background</button>
+      <button id="greetButton">👋 Greet Me</button>
+    </section>
 
-  <!-- Android / PWA -->
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <!-- Counter -->
+    <section>
+      <p>Count: <span id="counter">0</span></p>
+      <button id="incrementButton">➕ Increase</button>
+    </section>
 
-  <!-- Apple Touch Icon -->
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <!-- Step 2: Entries -->
+    <section id="entriesSection">
+      <h2>⭐ Try It Entries</h2>
+      
+      <form id="entryForm">
+        <input type="text" id="entryText" placeholder="Type something..." required />
+        <select id="entryCategory">
+          <option value="fun">🎉 Fun</option>
+          <option value="idea">💡 Idea</option>
+          <option value="note">📝 Note</option>
+        </select>
+        <button type="submit">Add Entry</button>
+      </form>
 
-  <!-- Default logo -->
-  <link rel="icon" href="logo.png">
+      <ul id="entriesList"></ul>
+    </section>
+  </main>
 
-  <!-- Theme color for mobile -->
-  <m
+  <script src="script.js"></script>
+</body>
+</html>
