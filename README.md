@@ -1,49 +1,36 @@
 # Try It App 🚀
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-
-# Try It App 🚀
-
-Your live app is deployed here:  
-👉 [https://brave-coast-099b57910.2.azurestaticapps.net](https://brave-coast-099b57910.2.azurestaticapps.net)
+[![Deploy to Azure](https://github.com/Azure/static-web-apps-deploy/actions/workflows/azure-static-web-apps.yml/badge.svg)](https://github.com/armyvet443-art/tryit-app/actions)
+![Status](https://img.shields.io/website?url=https%3A%2F%2Fbrave-coast-099b57910.2.azurestaticapps.net)
 
 ---
 
-## Features
-- 🌙 Dark mode toggle with local storage
-- 🖱 Click counter
-- 👋 Greeting messages
-- 🎨 Fun color changer
-- ⭐ Entry submissions with categories
+## 🌐 Live Demo  
+👉 [Try It App on Azure](https://brave-coast-099b57910.2.azurestaticapps.net)
 
 ---
 
-## Tech Stack
-- HTML5
-- CSS3
-- JavaScript
-- Deployed on **Azure Static Web Apps**
+## ✨ Features
+- 🌙 **Dark mode toggle** with local storage  
+- 🖱 **Click counter**  
+- 👋 **Greeting messages**  
+- 🎨 **Fun color changer**  
+- ⭐ **Entry submissions with categories**  
 
 ---
 
-## How to Run Locally
-1. Clone this repo  
-   ```bash
-   git clone https://github.com/armyvet443-art/tryit-app.git
-
-
----
-
-### Step 3: Save the file  
+## 🛠 Tech Stack
+- **Frontend:** HTML5, CSS3, JavaScript  
+- **Hosting:** Azure Static Web Apps  
+- **Version Control:** Git & GitHub  
 
 ---
 
-### Step 4: Commit + Push
-Run this in your terminal:
+## 🚀 Run Locally
+
+Clone the project:
 
 ```bash
-git add README.md
-git commit -m "📝 Added README with live site link and features"
-git push origin main
-
+git clone https://github.com/armyvet443-art/tryit-app.git
+cd tryit-app
