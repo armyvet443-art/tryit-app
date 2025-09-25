@@ -3,47 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Try It App 🚀</title>
+  <title>🚀 Try It App 🚀</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
-    <h1>🚀 Welcome to Try It App</h1>
-    <button id="darkModeToggle">🌙 Toggle Dark Mode</button>
-  </header>
+  <div class="container">
+    <h1>🚀 Welcome to Try It App 🚀</h1>
 
-  <main>
-    <!-- Fun buttons -->
-    <section>
+    <!-- Dark Mode Toggle -->
+    <button id="darkModeButton">🌙 Toggle Dark Mode</button>
+
+    <!-- Fun Buttons -->
+    <div class="card">
       <button id="funButton">🎉 Fun Button</button>
       <button id="colorButton">🎨 Change Background</button>
       <button id="greetButton">👋 Greet Me</button>
-    </section>
+    </div>
 
-    <!-- Counter -->
-    <section>
-      <p>Count: <span id="counter">0</span></p>
-      <button id="incrementButton">➕ Increase</button>
-    </section>
+    <!-- Counter Section -->
+    <div class="card">
+      <p>Count: <span id="count">0</span></p>
+      <button id="increaseButton">➕ Increase</button>
+    </div>
 
-    <!-- Step 2: Entries -->
-    <section id="entriesSection">
+    <!-- Entries Section -->
+    <div class="card">
       <h2>⭐ Try It Entries</h2>
-      
-      <form id="entryForm">
-        <input type="text" id="entryText" placeholder="Type something..." required />
-        <select id="entryCategory">
-          <option value="fun">🎉 Fun</option>
-          <option value="idea">💡 Idea</option>
-          <option value="note">📝 Note</option>
-        </select>
-        <button type="submit">Add Entry</button>
-      </form>
-
+      <input type="text" id="entryInput" placeholder="Type something..." />
+      <select id="entryCategory">
+        <option value="fun">🎉 Fun</option>
+        <option value="work">💼 Work</option>
+        <option value="life">🌱 Life</option>
+      </select>
+      <button id="addEntryButton">Add Entry</button>
       <ul id="entriesList"></ul>
-    </section>
-  </main>
-
+    </div>
+  </div>
   <script src="script.js"></script>
 </body>
 </html>

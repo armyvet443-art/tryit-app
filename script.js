@@ -1,68 +1,79 @@
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("✅ Script is running!");
+  console.log("✅ Script is running with localStorage!");
 
-  // Dark mode
-  const body = document.body;
-  const darkModeToggle = document.getElementById("darkModeToggle");
-  if (localStorage.getItem("darkMode") === "enabled") {
-    body.classList.add("dark");
-  }
-  darkModeToggle.addEventListener("click", () => {
-    body.classList.toggle("dark");
-    if (body.classList.contains("dark")) {
-      localStorage.setItem("darkMode", "enabled");
-    } else {
-      localStorage.setItem("darkMode", "disabled");
-    }
-  });
-
-  // Fun button
+  // Buttons
+  const darkModeButton = document.getElementById("darkModeButton");
   const funButton = document.getElementById("funButton");
-  funButton.addEventListener("click", () => {
-    alert("🎉 You clicked the Fun Button!");
-  });
-
-  // Color changer
   const colorButton = document.getElementById("colorButton");
-  colorButton.addEventListener("click", () => {
-    const randomColor = "#" + Math.floor(Math.random()*16777215).toString(16);
-    body.style.backgroundColor = randomColor;
-  });
-
-  // Greeting
   const greetButton = document.getElementById("greetButton");
-  greetButton.addEventListener("click", () => {
-    const name = prompt("What’s your name?");
-    if (name) alert(`👋 Hello, ${name}!`);
-  });
+  const increaseButton = document.getElementById("increaseButton");
+  const addEntryButton = document.getElementById("addEntryButton");
 
-  // Counter
-  const counter = document.getElementById("counter");
-  const incrementButton = document.getElementById("incrementButton");
-  let count = 0;
-  incrementButton.addEventListener("click", () => {
-    count++;
-    counter.textContent = count;
-  });
-
-  // Entries (Step 2)
-  const entryForm = document.getElementById("entryForm");
-  const entryText = document.getElementById("entryText");
+  // Elements
+  const countSpan = document.getElementById("count");
+  const entryInput = document.getElementById("entryInput");
   const entryCategory = document.getElementById("entryCategory");
   const entriesList = document.getElementById("entriesList");
 
-  entryForm.addEventListener("submit", (e) => {
-    e.preventDefault();
+  // Load from localStorage
+  let count = parseInt(localStorage.getItem("count")) || 0;
+  let entries = JSON.parse(localStorage.getItem("entries")) || [];
+  let darkMode = localStorage.getItem("darkMode") === "true";
 
-    const text = entryText.value.trim();
+  // Apply saved values
+  countSpan.textContent = count;
+  if (darkMode) document.body.classList.add("dark-mode");
+  renderEntries();
+
+  // Dark Mode Toggle
+  darkModeButton.addEventListener("click", () => {
+    document.body.classList.toggle("dark-mode");
+    localStorage.setItem("darkMode", document.body.classList.contains("dark-mode"));
+  });
+
+  // Fun Button
+  funButton.addEventListener("click", () => {
+    alert("🎉 Fun Button Clicked!");
+  });
+
+  // Change Background
+  colorButton.addEventListener("click", () => {
+    const colors = ["#f4a261", "#2a9d8f", "#e9c46a", "#e76f51", "#264653"];
+    document.body.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+  });
+
+  // Greet Button
+  greetButton.addEventListener("click", () => {
+    const name = prompt("What’s your name?");
+    if (name) alert(`👋 Hello, ${name}! Welcome to Try It App 🚀`);
+  });
+
+  // Increase Counter
+  increaseButton.addEventListener("click", () => {
+    count++;
+    countSpan.textContent = count;
+    localStorage.setItem("count", count);
+  });
+
+  // Add Entry
+  addEntryButton.addEventListener("click", () => {
+    const text = entryInput.value.trim();
     const category = entryCategory.value;
-
-    if (text !== "") {
-      const li = document.createElement("li");
-      li.textContent = `${text} (${category})`;
-      entriesList.appendChild(li);
-
-      entryText.value = "";
+    if (text) {
+      entries.push({ text, category });
+      localStorage.setItem("entries", JSON.stringify(entries));
+      entryInput.value = "";
+      renderEntries();
     }
   });
+
+  // Render Entries
+  function renderEntries() {
+    entriesList.innerHTML = "";
+    entries.forEach(entry => {
+      const li = document.createElement("li");
+      li.textContent = `${entry.text} (${entry.category})`;
+      entriesList.appendChild(li);
+    });
+  }
 });
