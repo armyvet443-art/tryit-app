@@ -1,84 +1,96 @@
 document.addEventListener("DOMContentLoaded", () => {
+  console.log("✅ Script is running!");
+
+  // ==== Buttons & Inputs ====
   const funButton = document.getElementById("funButton");
   const colorButton = document.getElementById("colorButton");
   const greetButton = document.getElementById("greetButton");
   const darkModeButton = document.getElementById("darkModeButton");
+  const nameInput = document.getElementById("nameInput");
+  const nameButton = document.getElementById("nameButton");
   const message = document.getElementById("message");
   const counterDisplay = document.getElementById("counter");
 
-  // Step 2: name input + button
-  const nameInput = document.getElementById("nameInput");
-  const nameButton = document.getElementById("nameButton");
+  // ==== Counter ====
+  let counter = 0;
 
-  let clickCount = 0;
-
-  // Array of fun messages
-  const funMessages = [
-    "🎉 You just clicked the TryIt App button!",
-    "🚀 Blast off! That button is working.",
-    "🔥 Boom! Click detected.",
-    "😎 Nice click — you’re a pro at this.",
-    "✨ Magic! The TryIt App responds."
-  ];
-
-  // Fun Button → random message
-  funButton.addEventListener("click", () => {
-    const randomIndex = Math.floor(Math.random() * funMessages.length);
-    message.textContent = funMessages[randomIndex];
-
-    // Restart animation
-    message.classList.remove("show");
-    void message.offsetWidth;
-    message.classList.add("show");
-
-    // Update counter
-    clickCount++;
-    counterDisplay.textContent = `Clicks: ${clickCount}`;
+  funButton?.addEventListener("click", () => {
+    counter++;
+    counterDisplay.textContent = `Clicks: ${counter}`;
   });
 
-  // Color Button → change background color
-  colorButton.addEventListener("click", () => {
-    const colors = ["#f5f5f5", "#ffe4e1", "#e6ffe6", "#e6f0ff", "#fff3cd"];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+  // ==== Random Background Color ====
+  colorButton?.addEventListener("click", () => {
+    const randomColor = `hsl(${Math.floor(Math.random() * 360)}, 70%, 80%)`;
     document.body.style.backgroundColor = randomColor;
   });
 
-  // Greet Button → friendly message
-  greetButton.addEventListener("click", () => {
-    message.textContent = "👋 Hello there! Thanks for trying the app.";
-
-    // Restart animation
-    message.classList.remove("show");
-    void message.offsetWidth;
-    message.classList.add("show");
+  // ==== Greeting Buttons ====
+  greetButton?.addEventListener("click", () => {
+    alert("👋 Hello from Try It App!");
   });
 
-  // Dark Mode Toggle (Step 1)
+  nameButton?.addEventListener("click", () => {
+    const name = nameInput.value.trim();
+    message.textContent = name ? `Hi, ${name}! 🎉` : "Please enter a name.";
+  });
+
+  // ==== Dark Mode (with localStorage) ====
   if (localStorage.getItem("darkMode") === "enabled") {
-    document.body.classList.add("dark");
+    document.body.classList.add("dark-mode");
   }
 
-  darkModeButton.addEventListener("click", () => {
-    document.body.classList.toggle("dark");
-    if (document.body.classList.contains("dark")) {
+  darkModeButton?.addEventListener("click", () => {
+    document.body.classList.toggle("dark-mode");
+    if (document.body.classList.contains("dark-mode")) {
       localStorage.setItem("darkMode", "enabled");
     } else {
-      localStorage.removeItem("darkMode");
+      localStorage.setItem("darkMode", "disabled");
     }
   });
 
-  // Step 2: Name Button → personalized greeting
-  nameButton.addEventListener("click", () => {
-    const name = nameInput.value.trim();
-    if (name) {
-      message.textContent = `👋 Hello, ${name}! Thanks for trying the app.`;
-    } else {
-      message.textContent = "⚠️ Please enter your name first!";
-    }
+  // ==== Entries Form ====
+  const form = document.getElementById("tryit-form");
+  const entriesList = document.getElementById("entries-list");
 
-    // Restart animation
-    message.classList.remove("show");
-    void message.offsetWidth;
-    message.classList.add("show");
+  // Load saved entries from localStorage
+  let savedEntries = JSON.parse(localStorage.getItem("entries")) || [];
+  savedEntries.forEach(addEntryToPage);
+
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+
+    const title = document.getElementById("title").value;
+    const category = document.getElementById("category").value;
+    const description = document.getElementById("description").value;
+    const rating = document.querySelector("input[name='rating']:checked")?.value || "⭐";
+
+    const entry = { title, category, description, rating, date: new Date().toLocaleString() };
+
+    // Save to localStorage
+    savedEntries.push(entry);
+    localStorage.setItem("entries", JSON.stringify(savedEntries));
+
+    addEntryToPage(entry);
+    form.reset();
   });
+
+  function addEntryToPage(entry) {
+    const card = document.createElement("div");
+    card.className = "entry-card";
+
+    card.innerHTML = `
+      <div class="entry-header">
+        <span class="entry-title">${entry.title}</span>
+        <span class="badge ${entry.category.toLowerCase()}">${entry.category}</span>
+      </div>
+      <p class="entry-desc">${entry.description}</p>
+      <div class="entry-footer">
+        <span class="stars">${entry.rating}</span>
+        <span class="meta">${entry.date}</span>
+      </div>
+    `;
+
+    entriesList.prepend(card);
+  }
 });
