@@ -1,11 +1,11 @@
 document.addEventListener("DOMContentLoaded", () => {
   console.log("✅ Script is running!");
 
-  // ========== Dark Mode ==========
+  // Dark Mode Toggle
   const darkModeToggle = document.getElementById("darkModeToggle");
-  if (localStorage.getItem("darkMode") === "enabled") {
-    document.body.classList.add("dark-mode");
-  }
+  const isDark = localStorage.getItem("darkMode") === "enabled";
+  if (isDark) document.body.classList.add("dark-mode");
+
   darkModeToggle.addEventListener("click", () => {
     document.body.classList.toggle("dark-mode");
     localStorage.setItem(
@@ -14,64 +14,63 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   });
 
-  // ========== Click Counter ==========
-  const clickCountSpan = document.getElementById("clickCount");
-  const incrementButton = document.getElementById("incrementButton");
+  // Greeting
+  const greetButton = document.getElementById("greetButton");
+  const greetMessage = document.getElementById("greetMessage");
 
-  let clickCount = parseInt(localStorage.getItem("clickCount")) || 0;
-  clickCountSpan.textContent = clickCount;
-
-  incrementButton.addEventListener("click", () => {
-    clickCount++;
-    clickCountSpan.textContent = clickCount;
-    localStorage.setItem("clickCount", clickCount);
+  greetButton.addEventListener("click", () => {
+    greetMessage.textContent = "Hello, friend! 👋";
   });
 
-  // ========== Entries ==========
+  // Click Counter
+  const funButton = document.getElementById("funButton");
+  const clickCount = document.getElementById("clickCount");
+  let count = parseInt(localStorage.getItem("clickCount")) || 0;
+  clickCount.textContent = `Count: ${count}`;
+
+  funButton.addEventListener("click", () => {
+    count++;
+    clickCount.textContent = `Count: ${count}`;
+    localStorage.setItem("clickCount", count);
+  });
+
+  // Background Color Changer
+  const colorButton = document.getElementById("colorButton");
+  colorButton.addEventListener("click", () => {
+    const randomColor = `hsl(${Math.floor(Math.random() * 360)}, 70%, 80%)`;
+    document.body.style.backgroundColor = randomColor;
+  });
+
+  // Entries with Local Storage
   const entryForm = document.getElementById("entryForm");
-  const entryText = document.getElementById("entryText");
-  const entryCategory = document.getElementById("entryCategory");
-  const entriesList = document.getElementById("entriesList");
+  const entryInput = document.getElementById("entryInput");
+  const categorySelect = document.getElementById("categorySelect");
+  const entryList = document.getElementById("entryList");
 
   let entries = JSON.parse(localStorage.getItem("entries")) || [];
 
-  function saveEntries() {
-    localStorage.setItem("entries", JSON.stringify(entries));
-  }
-
+  // Render entries on page load
   function renderEntries() {
-    entriesList.innerHTML = "";
-    entries.forEach((entry, index) => {
+    entryList.innerHTML = "";
+    entries.forEach((entry) => {
       const li = document.createElement("li");
-      li.textContent = `${entry.text} (${entry.category})`;
-
-      // Add delete button
-      const deleteBtn = document.createElement("button");
-      deleteBtn.textContent = "❌";
-      deleteBtn.classList.add("delete-btn");
-      deleteBtn.addEventListener("click", () => {
-        entries.splice(index, 1);
-        saveEntries();
-        renderEntries();
-      });
-
-      li.appendChild(deleteBtn);
-      entriesList.appendChild(li);
+      li.innerHTML = `<span>[${entry.category}]</span> ${entry.text}`;
+      entryList.appendChild(li);
     });
   }
 
+  renderEntries();
+
+  // Add new entry
   entryForm.addEventListener("submit", (e) => {
     e.preventDefault();
     const newEntry = {
-      text: entryText.value,
-      category: entryCategory.value,
+      text: entryInput.value,
+      category: categorySelect.value,
     };
     entries.push(newEntry);
-    saveEntries();
+    localStorage.setItem("entries", JSON.stringify(entries));
     renderEntries();
     entryForm.reset();
   });
-
-  // Initial render
-  renderEntries();
 });

@@ -8,29 +8,49 @@
 </head>
 <body>
   <header>
-    <h1>🚀 Try It App</h1>
+    <h1>Try It App 🚀</h1>
     <button id="darkModeToggle">🌙 Toggle Dark Mode</button>
   </header>
 
   <main>
+    <!-- Greeting -->
     <section>
-      <h2>Click Counter 🖱</h2>
-      <p>Count: <span id="clickCount">0</span></p>
-      <button id="incrementButton">Click Me!</button>
+      <h2>👋 Greeting</h2>
+      <button id="greetButton">Say Hi</button>
+      <p id="greetMessage"></p>
     </section>
 
+    <!-- Click Counter -->
     <section>
-      <h2>Add an Entry ✨</h2>
+      <h2>🖱 Click Counter</h2>
+      <button id="funButton">Click Me!</button>
+      <p id="clickCount">Count: 0</p>
+    </section>
+
+    <!-- Color Changer -->
+    <section>
+      <h2>🎨 Fun Color</h2>
+      <button id="colorButton">Change Background</button>
+    </section>
+
+    <!-- Entry Form -->
+    <section>
+      <h2>⭐ Add Your Entry</h2>
       <form id="entryForm">
-        <input type="text" id="entryText" placeholder="Type something..." required />
-        <select id="entryCategory">
-          <option value="general">General</option>
-          <option value="fun">Fun</option>
-          <option value="work">Work</option>
+        <input type="text" id="entryInput" placeholder="Write something..." required />
+        <select id="categorySelect">
+          <option value="General">General</option>
+          <option value="Idea">Idea</option>
+          <option value="Feedback">Feedback</option>
         </select>
         <button type="submit">Add Entry</button>
       </form>
-      <ul id="entriesList"></ul>
+    </section>
+
+    <!-- Entry List -->
+    <section>
+      <h2>📋 All Entries</h2>
+      <ul id="entryList"></ul>
     </section>
   </main>
 
