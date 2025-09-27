@@ -1,76 +1,123 @@
-/* General Styling */
+/* ===== Base Styles ===== */
 body {
   font-family: Arial, sans-serif;
   margin: 0;
-  padding: 0;
+  padding: 20px;
+  background-color: #f4f4f9;
+  color: #333;
   transition: background 0.3s, color 0.3s;
 }
 
-header {
-  background: #6200ea;
-  color: white;
-  padding: 1rem;
-  text-align: center;
-}
-
-main {
-  padding: 1rem;
-  max-width: 600px;
-  margin: auto;
+h1, h2 {
+  color: #444;
 }
 
 section {
-  margin-bottom: 2rem;
-  padding: 1rem;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background: #f9f9f9;
+  margin-bottom: 20px;
+  padding: 15px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: background 0.3s, color 0.3s;
 }
 
-/* Buttons */
+/* ===== Buttons ===== */
 button {
-  padding: 0.5rem 1rem;
-  margin-top: 0.5rem;
-  cursor: pointer;
+  padding: 10px 15px;
+  margin: 5px 0;
   border: none;
-  border-radius: 5px;
-  background: #6200ea;
+  border-radius: 8px;
+  background-color: #0078d7;
   color: white;
-  transition: background 0.3s;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.3s, transform 0.2s;
 }
 
 button:hover {
-  background: #3700b3;
+  background-color: #005a9e;
+  transform: scale(1.05);
 }
 
-/* Dark Mode */
-.dark-mode {
-  background: #121212;
-  color: #f1f1f1;
+button:active {
+  transform: scale(0.95);
 }
 
-.dark-mode header {
-  background: #3700b3;
+/* ===== Inputs & Dropdowns ===== */
+input, select {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+  margin-top: 5px;
+  margin-bottom: 10px;
+  width: 100%;
+  max-width: 400px;
+  box-sizing: border-box;
+  transition: all 0.2s ease-in-out;
 }
 
-.dark-mode section {
-  background: #1e1e1e;
-  border-color: #333;
+/* Input focus */
+input:focus, select:focus {
+  outline: none;
+  border-color: #0078d7;
+  box-shadow: 0 0 6px rgba(0, 120, 215, 0.4);
 }
 
-/* Entries */
+/* Dropdown hover */
+select:hover {
+  border-color: #0078d7;
+  box-shadow: 0 0 4px rgba(0, 120, 215, 0.3);
+}
+
+/* ===== Entry List ===== */
 #entryList {
-  list-style-type: none;
+  list-style: none;
   padding: 0;
 }
 
 #entryList li {
-  padding: 0.5rem;
-  margin: 0.3rem 0;
-  border-bottom: 1px solid #ccc;
+  padding: 8px;
+  margin: 5px 0;
+  background: #eee;
+  border-radius: 6px;
+  transition: background 0.3s;
 }
 
-#entryList li span {
-  font-weight: bold;
-  color: #6200ea;
+/* ===== Dark Mode ===== */
+body.dark-mode {
+  background-color: #1e1e1e;
+  color: #f4f4f9;
+}
+
+body.dark-mode section {
+  background: #2c2c2c;
+  color: #f4f4f9;
+}
+
+body.dark-mode button {
+  background-color: #00aaff;
+  color: #fff;
+}
+
+body.dark-mode button:hover {
+  background-color: #008ecc;
+}
+
+/* Inputs & dropdowns in dark mode */
+body.dark-mode input,
+body.dark-mode select {
+  background-color: #333;
+  color: #fff;
+  border: 1px solid #666;
+}
+
+body.dark-mode input:focus,
+body.dark-mode select:focus {
+  border-color: #00aaff;
+  box-shadow: 0 0 6px rgba(0, 170, 255, 0.4);
+}
+
+body.dark-mode #entryList li {
+  background: #444;
 }
