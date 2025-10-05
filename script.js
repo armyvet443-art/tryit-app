@@ -18,16 +18,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const darkModeToggle = document.getElementById("darkModeToggle");
 
-  // NEW: Tools
+  // Tools
   const searchInput = document.getElementById("searchInput");
   const clearAllBtn = document.getElementById("clearAllBtn");
+  const filterCategory = document.getElementById("filterCategory");
+
+  // Central categories list (keep in sync with HTML options)
+  const CATEGORIES = ["General","Idea","Feedback","Recipes","Date Night","Dances"];
 
   // Load state
   let count = parseInt(localStorage.getItem("clickCount")) || 0;
   clickCount.textContent = `Count: ${count}`;
 
   let entries = loadEntries(); // [{text, category, createdAt}]
-  let searchQuery = "";        // live search filter
+  let searchQuery = "";
+  let categoryFilter = "All";
 
   renderEntries();
 
@@ -62,11 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const category = categorySelect.value || "General";
     if (!text) return;
 
-    const newEntry = {
-      text,
-      category,
-      createdAt: new Date().toISOString()
-    };
+    const newEntry = { text, category, createdAt: new Date().toISOString() };
     entries.push(newEntry);
     saveEntries(entries);
     renderEntries();
@@ -82,7 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   });
 
-  // NEW: Clear All
+  // Clear All
   clearAllBtn.addEventListener("click", () => {
     if (!entries.length) return;
     const sure = confirm("This will delete ALL entries on this device. Continue?");
@@ -92,9 +93,15 @@ document.addEventListener("DOMContentLoaded", () => {
     renderEntries();
   });
 
-  // NEW: Search (live)
+  // Search (live)
   searchInput.addEventListener("input", (e) => {
     searchQuery = (e.target.value || "").toLowerCase().trim();
+    renderEntries();
+  });
+
+  // Category Filter (live)
+  filterCategory.addEventListener("change", (e) => {
+    categoryFilter = e.target.value || "All";
     renderEntries();
   });
 
@@ -103,26 +110,27 @@ document.addEventListener("DOMContentLoaded", () => {
     try { return JSON.parse(localStorage.getItem("entries")) || []; }
     catch { return []; }
   }
-  function saveEntries(list) {
-    localStorage.setItem("entries", JSON.stringify(list));
+  function saveEntries(list) { localStorage.setItem("entries", JSON.stringify(list)); }
+  function formatDate(iso) { try { return new Date(iso).toLocaleString(); } catch { return ""; } }
+
+  function passesSearch(entry) {
+    if (!searchQuery) return true;
+    return (
+      entry.text.toLowerCase().includes(searchQuery) ||
+      entry.category.toLowerCase().includes(searchQuery)
+    );
   }
-  function formatDate(iso) {
-    try { return new Date(iso).toLocaleString(); }
-    catch { return ""; }
+  function passesCategory(entry) {
+    if (categoryFilter === "All") return true;
+    return entry.category === categoryFilter;
   }
 
   function renderEntries() {
     entryList.innerHTML = "";
 
-    // filter by search
-    const filtered = entries.filter(e =>
-      !searchQuery ||
-      e.text.toLowerCase().includes(searchQuery) ||
-      e.category.toLowerCase().includes(searchQuery)
-    );
+    const filtered = entries.filter(e => passesSearch(e) && passesCategory(e));
 
-    filtered.forEach((entry, idxFiltered) => {
-      // find the real index in entries array for edit/delete ops
+    filtered.forEach((entry) => {
       const realIndex = entries.indexOf(entry);
 
       const li = document.createElement("li");

@@ -51,14 +51,23 @@
       </form>
     </section>
 
-    <!-- Tools: Search + Clear All -->
+    <!-- Tools: Search + Category Filter + Clear All -->
     <section>
       <h2>🔎 Find & Manage</h2>
       <div class="tools-row">
         <input id="searchInput" type="search" placeholder="Search entries…" />
+        <select id="filterCategory">
+          <option value="All">All Categories</option>
+          <option value="General">General</option>
+          <option value="Idea">Idea</option>
+          <option value="Feedback">Feedback</option>
+          <option value="Recipes">Recipes</option>
+          <option value="Date Night">Date Night</option>
+          <option value="Dances">Dances</option>
+        </select>
         <button id="clearAllBtn" class="btn-danger">🗑️ Clear All Entries</button>
       </div>
-      <p class="hint">Search filters as you type. “Clear All” permanently removes saved entries on this device.</p>
+      <p class="hint">Use Search and Category together to narrow results. “Clear All” wipes saved entries on this device.</p>
     </section>
 
     <!-- Entry List (Interactive) -->
