@@ -2,81 +2,85 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Try It App 🚀</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
+  <header class="toolbar">
     <h1>Try It App 🚀</h1>
-    <button id="darkModeToggle">🌙 Toggle Dark Mode</button>
+    <div class="toolbar-right">
+      <button id="darkModeToggle" class="btn">🌙 Dark</button>
+      <input id="searchInput" type="search" placeholder="Search entries…"/>
+      <select id="filterCategory">
+        <option value="">All</option>
+        <option value="Food">Food</option>
+        <option value="Product">Product</option>
+        <option value="Travel">Travel</option>
+        <option value="Fitness">Fitness</option>
+        <option value="Recipes">Recipes</option>
+        <option value="Date Night">Date Night</option>
+        <option value="Dances">Dances</option>
+      </select>
+      <button id="clearFilters" class="btn">Clear Filters</button>
+    </div>
   </header>
 
-  <main>
-    <!-- Greeting -->
-    <section>
-      <h2>👋 Greeting</h2>
-      <input type="text" id="nameInput" placeholder="Enter your name..." />
-      <button id="greetButton">Say Hi</button>
-      <p id="greetMessage"></p>
-    </section>
-
-    <!-- Click Counter -->
-    <section>
-      <h2>🖱 Click Counter</h2>
-      <button id="funButton">Click Me!</button>
-      <p id="clickCount">Count: 0</p>
-    </section>
-
-    <!-- Color Changer -->
-    <section>
-      <h2>🎨 Fun Color</h2>
-      <button id="colorButton">Change Background</button>
-    </section>
-
-    <!-- Entry Form -->
-    <section>
-      <h2>⭐ Add Your Entry</h2>
-      <form id="entryForm">
-        <input type="text" id="entryInput" placeholder="Write something..." required />
-        <select id="categorySelect">
-          <option value="General">General</option>
-          <option value="Idea">Idea</option>
-          <option value="Feedback">Feedback</option>
-          <option value="Recipes">Recipes</option>
-          <option value="Date Night">Date Night</option>
-          <option value="Dances">Dances</option>
-        </select>
-        <button type="submit">Add Entry</button>
-      </form>
-    </section>
-
-    <!-- Tools: Search + Category Filter + Clear All -->
-    <section>
-      <h2>🔎 Find & Manage</h2>
-      <div class="tools-row">
-        <input id="searchInput" type="search" placeholder="Search entries…" />
-        <select id="filterCategory">
-          <option value="All">All Categories</option>
-          <option value="General">General</option>
-          <option value="Idea">Idea</option>
-          <option value="Feedback">Feedback</option>
-          <option value="Recipes">Recipes</option>
-          <option value="Date Night">Date Night</option>
-          <option value="Dances">Dances</option>
-        </select>
-        <button id="clearAllBtn" class="btn-danger">🗑️ Clear All Entries</button>
+  <main class="card">
+    <h2>Add an Entry</h2>
+    <form id="entryForm">
+      <div class="row">
+        <div>
+          <label for="entryTitle">Title</label>
+          <input id="entryTitle" type="text" required />
+        </div>
+        <div>
+          <label for="entryCategory">Category</label>
+          <select id="entryCategory" required>
+        <option value="Food">Food</option>
+        <option value="Product">Product</option>
+        <option value="Travel">Travel</option>
+        <option value="Fitness">Fitness</option>
+        <option value="Recipes">Recipes</option>
+        <option value="Date Night">Date Night</option>
+        <option value="Dances">Dances</option>
+          </select>
+        </div>
       </div>
-      <p class="hint">Use Search and Category together to narrow results. “Clear All” wipes saved entries on this device.</p>
-    </section>
 
-    <!-- Entry List (Interactive) -->
-    <section>
-      <h2>📋 All Entries</h2>
-      <div id="resultsInfo" class="results-info">Results: 0 entries</div>
-      <ul id="entryList" class="entry-list"></ul>
-    </section>
+      <label for="entryText">What did you try?</label>
+      <textarea id="entryText" rows="3" placeholder="Write a quick note…" required></textarea>
+
+      <div class="row">
+        <div>
+          <label for="entryRating">Rating</label>
+          <select id="entryRating" required>
+            <option value="5">⭐⭐⭐⭐⭐ (5)</option>
+            <option value="4">⭐⭐⭐⭐ (4)</option>
+            <option value="3">⭐⭐⭐ (3)</option>
+            <option value="2">⭐⭐ (2)</option>
+            <option value="1">⭐ (1)</option>
+          </select>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="btn" type="submit">Add Entry</button>
+        </div>
+      </div>
+    </form>
   </main>
+
+  <section class="card entries">
+    <div class="toolbar">
+      <h2>Entries</h2>
+      <div>
+        <button id="clearAll" class="btn btn-danger">Clear All</button>
+      </div>
+    </div>
+    <div id="entries-list"></div>
+  </section>
+
+  <footer id="site-footer">Made with ❤️ in Try It App</footer>
 
   <script src="script.js"></script>
 </body>

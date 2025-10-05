@@ -1,258 +1,235 @@
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("✅ Script running!");
+// ---------- Storage helpers ----------
+const LS_KEY = "tryit_entries_v2";
+const THEME_KEY = "tryit_theme";
 
-  // DOM
-  const greetButton = document.getElementById("greetButton");
-  const greetMessage = document.getElementById("greetMessage");
-  const nameInput = document.getElementById("nameInput");
+const loadEntries = () => JSON.parse(localStorage.getItem(LS_KEY) || "[]");
+const saveEntries = (arr) => localStorage.setItem(LS_KEY, JSON.stringify(arr));
 
-  const funButton = document.getElementById("funButton");
-  const clickCount = document.getElementById("clickCount");
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
 
-  const colorButton = document.getElementById("colorButton");
+// ---------- DOM ----------
+const darkToggle = document.getElementById("darkModeToggle");
+const entryForm = document.getElementById("entryForm");
+const entryTitle = document.getElementById("entryTitle");
+const entryCategory = document.getElementById("entryCategory");
+const entryText = document.getElementById("entryText");
+const entryRating = document.getElementById("entryRating");
+const entriesList = document.getElementById("entries-list");
 
-  const entryForm = document.getElementById("entryForm");
-  const entryInput = document.getElementById("entryInput");
-  const categorySelect = document.getElementById("categorySelect");
-  const entryList = document.getElementById("entryList");
+const searchInput = document.getElementById("searchInput");
+const filterCategory = document.getElementById("filterCategory");
+const clearFilters = document.getElementById("clearFilters");
+const clearAll = document.getElementById("clearAll");
 
-  const resultsInfo = document.getElementById("resultsInfo");
+// ---------- Dark mode ----------
+(function initTheme(){
+  const mode = localStorage.getItem(THEME_KEY) || "light";
+  if (mode === "dark") document.body.classList.add("dark");
+})();
+darkToggle.addEventListener("click", () => {
+  document.body.classList.toggle("dark");
+  localStorage.setItem(THEME_KEY, document.body.classList.contains("dark") ? "dark" : "light");
+});
 
-  const darkModeToggle = document.getElementById("darkModeToggle");
+// ---------- Render ----------
+function stars(n){
+  const s = Number(n)||0;
+  return "★★★★★".slice(0,s) + "☆☆☆☆☆".slice(s);
+}
+function catBadgeClass(cat){
+  const key = (cat||"").toLowerCase();
+  if (key === "food") return "food";
+  if (key === "product") return "product";
+  if (key === "travel") return "travel";
+  if (key === "fitness") return "fitness";
+  if (key === "recipes") return "recipes";
+  if (key === "date night") return "date-night";
+  if (key === "dances") return "dances";
+  return "";
+}
 
-  // Tools
-  const searchInput = document.getElementById("searchInput");
-  const clearAllBtn = document.getElementById("clearAllBtn");
-  const filterCategory = document.getElementById("filterCategory");
+function renderEntries() {
+  const q = (searchInput.value || "").trim().toLowerCase();
+  const fcat = (filterCategory.value || "").toLowerCase();
+  const entries = loadEntries();
 
-  // Categories list (keep in sync with HTML)
-  const CATEGORIES = ["General","Idea","Feedback","Recipes","Date Night","Dances"];
+  const filtered = entries.filter(e => {
+    const hitText = (e.title + " " + e.text).toLowerCase().includes(q);
+    const hitCat = !fcat || e.category.toLowerCase() === fcat;
+    return hitText && hitCat;
+  });
 
-  // Load state
-  let count = parseInt(localStorage.getItem("clickCount")) || 0;
-  clickCount.textContent = `Count: ${count}`;
+  if (!filtered.length) {
+    entriesList.innerHTML = `<p style="color:#777">No entries yet. Add your first one!</p>`;
+    return;
+  }
 
-  let entries = loadEntries(); // [{text, category, createdAt}]
-  let searchQuery = "";
-  let categoryFilter = "All";
+  entriesList.innerHTML = filtered.map(e => {
+    const likeCount = e.likes || 0;
+    const comments = e.comments || [];
+    return `
+    <article class="entry-card" data-id="${e.id}">
+      <div class="entry-header">
+        <div class="entry-title">${escapeHtml(e.title)}</div>
+        <span class="badge ${catBadgeClass(e.category)}">${escapeHtml(e.category)}</span>
+      </div>
+      <div class="entry-desc">${escapeHtml(e.text)}</div>
+      <div class="entry-footer">
+        <div class="stars" title="${e.rating} stars">${stars(e.rating)}</div>
+        <div class="meta">${new Date(e.ts).toLocaleString()}</div>
+      </div>
 
+      <div class="actions">
+        <button class="icon-btn like-btn" data-id="${e.id}" aria-label="like">
+          ❤️ <span class="count">${likeCount}</span>
+        </button>
+        <button class="icon-btn comment-toggle" data-id="${e.id}" aria-label="comments">
+          💬 <span class="count">${comments.length}</span>
+        </button>
+        <button class="icon-btn edit-btn" data-id="${e.id}">✏️ Edit</button>
+        <button class="icon-btn delete-btn" data-id="${e.id}">🗑️ Delete</button>
+      </div>
+
+      <div class="comments" id="comments-${e.id}" style="display:none">
+        <div class="comment-list">
+          ${comments.map(c => `
+            <div class="comment">
+              <div class="comment-meta">${new Date(c.ts).toLocaleString()}</div>
+              <div>${escapeHtml(c.text)}</div>
+            </div>
+          `).join("")}
+        </div>
+        <form class="comment-form" data-id="${e.id}">
+          <input type="text" placeholder="Write a comment…" required />
+          <button class="btn" type="submit">Post</button>
+        </form>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+// ---------- Add Entry ----------
+entryForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const entries = loadEntries();
+  entries.unshift({
+    id: uid(),
+    title: entryTitle.value.trim(),
+    category: entryCategory.value,
+    text: entryText.value.trim(),
+    rating: Number(entryRating.value),
+    ts: Date.now(),
+    likes: 0,
+    comments: []
+  });
+  saveEntries(entries);
+  entryForm.reset();
   renderEntries();
+});
 
-  // Dark mode restore
-  if (localStorage.getItem("darkMode") === "enabled") {
-    document.body.classList.add("dark-mode");
-  }
+// ---------- List Delegation (like, comment, edit, delete, toggle) ----------
+entriesList.addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (!id) return;
 
-  // Greeting
-  greetButton.addEventListener("click", () => {
-    const name = (nameInput.value || "").trim() || "Friend";
-    greetMessage.textContent = `Hello, ${name}! 👋`;
-  });
+  const entries = loadEntries();
+  const idx = entries.findIndex(x => x.id === id);
+  if (idx < 0) return;
 
-  // Click Counter
-  funButton.addEventListener("click", () => {
-    count++;
-    localStorage.setItem("clickCount", count);
-    clickCount.textContent = `Count: ${count}`;
-  });
-
-  // Color changer
-  colorButton.addEventListener("click", () => {
-    const randomColor = `hsl(${Math.floor(Math.random() * 360)}, 70%, 70%)`;
-    document.body.style.backgroundColor = randomColor;
-  });
-
-  // Add entry
-  entryForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const text = (entryInput.value || "").trim();
-    const category = categorySelect.value || "General";
-    if (!text) return;
-
-    const newEntry = { text, category, createdAt: new Date().toISOString() };
-    entries.push(newEntry);
+  // Like
+  if (btn.classList.contains("like-btn")) {
+    entries[idx].likes = (entries[idx].likes || 0) + 1;
     saveEntries(entries);
     renderEntries();
-    entryForm.reset();
-  });
+    return;
+  }
 
-  // Dark mode toggle
-  darkModeToggle.addEventListener("click", () => {
-    document.body.classList.toggle("dark-mode");
-    localStorage.setItem(
-      "darkMode",
-      document.body.classList.contains("dark-mode") ? "enabled" : "disabled"
-    );
-  });
+  // Toggle comments
+  if (btn.classList.contains("comment-toggle")) {
+    const wrap = document.getElementById(`comments-${id}`);
+    if (wrap) wrap.style.display = (wrap.style.display === "none" ? "block" : "none");
+    return;
+  }
 
-  // Clear All
-  clearAllBtn.addEventListener("click", () => {
-    if (!entries.length) return;
-    const sure = confirm("This will delete ALL entries on this device. Continue?");
-    if (!sure) return;
-    entries = [];
+  // Edit
+  if (btn.classList.contains("edit-btn")) {
+    // Prefill form with the entry and scroll to top
+    entryTitle.value = entries[idx].title;
+    entryCategory.value = entries[idx].category;
+    entryText.value = entries[idx].text;
+    entryRating.value = entries[idx].rating;
+    // Remove the old version (we'll re-add on submit)
+    entries.splice(idx,1);
     saveEntries(entries);
     renderEntries();
-  });
-
-  // Search (live)
-  searchInput.addEventListener("input", (e) => {
-    searchQuery = (e.target.value || "").toLowerCase().trim();
-    renderEntries();
-  });
-
-  // Category Filter (live)
-  filterCategory.addEventListener("change", (e) => {
-    categoryFilter = e.target.value || "All";
-    renderEntries();
-  });
-
-  /* ===== Helpers ===== */
-  function loadEntries() {
-    try { return JSON.parse(localStorage.getItem("entries")) || []; }
-    catch { return []; }
-  }
-  function saveEntries(list) { localStorage.setItem("entries", JSON.stringify(list)); }
-  function formatDate(iso) { try { return new Date(iso).toLocaleString(); } catch { return ""; } }
-
-  function passesSearch(entry) {
-    if (!searchQuery) return true;
-    return (
-      entry.text.toLowerCase().includes(searchQuery) ||
-      entry.category.toLowerCase().includes(searchQuery)
-    );
-  }
-  function passesCategory(entry) {
-    if (categoryFilter === "All") return true;
-    return entry.category === categoryFilter;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
   }
 
-  function slugCategory(cat) {
-    // Map category to CSS class slug
-    switch ((cat || "").toLowerCase()) {
-      case "general": return "general";
-      case "idea": return "idea";
-      case "feedback": return "feedback";
-      case "recipes": return "recipes";
-      case "date night": return "date-night";
-      case "dances": return "dances";
-      default: return "general";
-    }
-  }
-
-  function pluralize(n, one = "entry", many = "entries") {
-    return `${n} ${n === 1 ? one : many}`;
-  }
-
-  function renderEntries() {
-    entryList.innerHTML = "";
-
-    const filtered = entries.filter(e => passesSearch(e) && passesCategory(e));
-
-    // Update results counter
-    resultsInfo.textContent = `Results: ${pluralize(filtered.length)}`;
-
-    filtered.forEach((entry) => {
-      const realIndex = entries.indexOf(entry);
-
-      const li = document.createElement("li");
-      li.className = "entry-card";
-      li.dataset.index = realIndex.toString();
-
-      const top = document.createElement("div");
-      top.className = "entry-top";
-
-      const badge = document.createElement("span");
-      badge.className = `badge ${slugCategory(entry.category)}`;
-      badge.textContent = entry.category;
-
-      const text = document.createElement("div");
-      text.className = "entry-text";
-      text.textContent = entry.text;
-
-      top.appendChild(badge);
-      top.appendChild(text);
-
-      const meta = document.createElement("div");
-      meta.className = "entry-meta";
-      meta.textContent = `Added: ${formatDate(entry.createdAt)}`;
-
-      const actions = document.createElement("div");
-      actions.className = "entry-actions";
-
-      const editBtn = document.createElement("button");
-      editBtn.className = "btn-ghost";
-      editBtn.textContent = "✏️ Edit";
-      editBtn.addEventListener("click", () => startEdit(li, realIndex, entry));
-
-      const delBtn = document.createElement("button");
-      delBtn.className = "btn-danger";
-      delBtn.textContent = "❌ Delete";
-      delBtn.addEventListener("click", () => {
-        entries.splice(realIndex, 1);
-        saveEntries(entries);
-        renderEntries();
-      });
-
-      actions.appendChild(editBtn);
-      actions.appendChild(delBtn);
-
-      li.appendChild(top);
-      li.appendChild(meta);
-      li.appendChild(actions);
-
-      entryList.appendChild(li);
-    });
-  }
-
-  function startEdit(cardEl, idx, entry) {
-    cardEl.innerHTML = "";
-
-    const editor = document.createElement("div");
-    editor.className = "entry-edit-row";
-
-    const editText = document.createElement("input");
-    editText.type = "text";
-    editText.value = entry.text;
-
-    const editCat = document.createElement("select");
-    ["General","Idea","Feedback","Recipes","Date Night","Dances"].forEach(c => {
-      const opt = document.createElement("option");
-      opt.value = c; opt.textContent = c;
-      if (c === entry.category) opt.selected = true;
-      editCat.appendChild(opt);
-    });
-
-    const saveBtn = document.createElement("button");
-    saveBtn.className = "btn-success";
-    saveBtn.textContent = "💾 Save";
-
-    const cancelBtn = document.createElement("button");
-    cancelBtn.className = "btn-ghost";
-    cancelBtn.textContent = "↩️ Cancel";
-
-    saveBtn.addEventListener("click", () => {
-      const newText = (editText.value || "").trim();
-      const newCat = editCat.value || "General";
-      if (!newText) { editText.focus(); return; }
-
-      entries[idx] = { ...entries[idx], text: newText, category: newCat };
+  // Delete
+  if (btn.classList.contains("delete-btn")) {
+    if (confirm("Delete this entry?")) {
+      entries.splice(idx,1);
       saveEntries(entries);
       renderEntries();
-    });
-
-    cancelBtn.addEventListener("click", renderEntries);
-
-    editor.appendChild(editText);
-    editor.appendChild(editCat);
-    editor.appendChild(saveBtn);
-    editor.appendChild(cancelBtn);
-    cardEl.appendChild(editor);
-
-    const meta = document.createElement("div");
-    meta.className = "entry-meta";
-    meta.textContent = `Added: ${formatDate(entry.createdAt)}`;
-    meta.style.marginTop = "6px";
-    cardEl.appendChild(meta);
+    }
+    return;
   }
 });
+
+// Handle comment submit (delegated)
+entriesList.addEventListener("submit", (e) => {
+  const form = e.target.closest(".comment-form");
+  if (!form) return;
+  e.preventDefault();
+
+  const id = form.dataset.id;
+  const input = form.querySelector("input");
+  const text = (input.value || "").trim();
+  if (!text) return;
+
+  const entries = loadEntries();
+  const idx = entries.findIndex(x => x.id === id);
+  if (idx < 0) return;
+
+  entries[idx].comments = entries[idx].comments || [];
+  entries[idx].comments.push({ id: uid(), text, ts: Date.now() });
+  saveEntries(entries);
+
+  input.value = "";
+  renderEntries();
+
+  // keep comments open
+  const wrap = document.getElementById(`comments-${id}`);
+  if (wrap) wrap.style.display = "block";
+});
+
+// ---------- Filters ----------
+searchInput.addEventListener("input", renderEntries);
+filterCategory.addEventListener("change", renderEntries);
+clearFilters.addEventListener("click", () => {
+  searchInput.value = "";
+  filterCategory.value = "";
+  renderEntries();
+});
+clearAll.addEventListener("click", () => {
+  if (confirm("Clear ALL entries?")) {
+    saveEntries([]);
+    renderEntries();
+  }
+});
+
+// ---------- Utils ----------
+function escapeHtml(str){
+  return String(str)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+// ---------- Init ----------
+document.addEventListener("DOMContentLoaded", renderEntries);
