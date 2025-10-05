@@ -7,37 +7,44 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- ─── Navbar ─────────────────────────────── -->
+  <nav class="navbar">
+    <div class="logo">
+      <img src="logo.png" alt="Try It App Logo" />
+      <span>Try It App</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="#">Home</a></li>
+      <li><a href="#">Discover</a></li>
+      <li><a href="#">Profile</a></li>
+    </ul>
+  </nav>
+
+  <!-- ─── Header ─────────────────────────────── -->
   <header>
     <h1>⭐ Try It App</h1>
     <p>Share and track what you’re trying today!</p>
   </header>
 
   <main>
-    <!-- --- Controls --- -->
+    <!-- Controls -->
     <section id="controls">
       <button id="funButton">⭐ Count Clicks</button>
       <span>Clicks: <span id="clickCount">0</span></span>
-
       <button id="colorButton">🎨 Random Color</button>
       <button id="greetButton">👋 Greet</button>
       <span id="greetMessage"></span>
-
-      <button id="darkModeToggle">🌙 Toggle Dark Mode</button>
-      <button id="exportBtn" type="button">💾 Export Entries</button>
+      <button id="darkModeToggle">🌙 Dark Mode</button>
+      <button id="exportBtn" type="button">💾 Export</button>
       <button id="clearAllBtn" type="button">🗑️ Clear All</button>
     </section>
 
     <hr />
 
-    <!-- --- Entry Form --- -->
+    <!-- Entry form -->
     <section id="entrySection">
       <form id="entryForm">
-        <input
-          id="entryInput"
-          type="text"
-          placeholder="What are you trying today?"
-          required
-        />
+        <input id="entryInput" type="text" placeholder="What are you trying today?" required />
         <select id="categorySelect">
           <option value="Health">Health</option>
           <option value="Travel">Travel</option>
@@ -47,7 +54,6 @@
         </select>
         <button type="submit">Add Entry</button>
       </form>
-
       <ul id="entryList"></ul>
     </section>
   </main>
