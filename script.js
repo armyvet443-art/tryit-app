@@ -16,6 +16,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const categorySelect = document.getElementById("categorySelect");
   const entryList = document.getElementById("entryList");
 
+  const resultsInfo = document.getElementById("resultsInfo");
+
   const darkModeToggle = document.getElementById("darkModeToggle");
 
   // Tools
@@ -23,7 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const clearAllBtn = document.getElementById("clearAllBtn");
   const filterCategory = document.getElementById("filterCategory");
 
-  // Central categories list (keep in sync with HTML options)
+  // Categories list (keep in sync with HTML)
   const CATEGORIES = ["General","Idea","Feedback","Recipes","Date Night","Dances"];
 
   // Load state
@@ -125,10 +127,30 @@ document.addEventListener("DOMContentLoaded", () => {
     return entry.category === categoryFilter;
   }
 
+  function slugCategory(cat) {
+    // Map category to CSS class slug
+    switch ((cat || "").toLowerCase()) {
+      case "general": return "general";
+      case "idea": return "idea";
+      case "feedback": return "feedback";
+      case "recipes": return "recipes";
+      case "date night": return "date-night";
+      case "dances": return "dances";
+      default: return "general";
+    }
+  }
+
+  function pluralize(n, one = "entry", many = "entries") {
+    return `${n} ${n === 1 ? one : many}`;
+  }
+
   function renderEntries() {
     entryList.innerHTML = "";
 
     const filtered = entries.filter(e => passesSearch(e) && passesCategory(e));
+
+    // Update results counter
+    resultsInfo.textContent = `Results: ${pluralize(filtered.length)}`;
 
     filtered.forEach((entry) => {
       const realIndex = entries.indexOf(entry);
@@ -141,7 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
       top.className = "entry-top";
 
       const badge = document.createElement("span");
-      badge.className = "badge";
+      badge.className = `badge ${slugCategory(entry.category)}`;
       badge.textContent = entry.category;
 
       const text = document.createElement("div");

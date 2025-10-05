@@ -40,6 +40,12 @@ input:focus, select:focus { outline: none; border-color: #0078d7; box-shadow: 0 
 .hint { font-size: .85rem; color: #777; margin-top: 6px; }
 
 /* ===== Entries ===== */
+.results-info {
+  font-size: .9rem;
+  color: #666;
+  margin: 4px 0 8px;
+}
+
 .entry-list { list-style: none; padding: 0; margin: 0; }
 .entry-card {
   display: flex; flex-direction: column; gap: 8px;
@@ -47,7 +53,10 @@ input:focus, select:focus { outline: none; border-color: #0078d7; box-shadow: 0 
   background: #f9fbff; border: 1px solid #e5eefc;
 }
 .entry-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .8rem; font-weight: 700; background: #eef5ff; color: #0b63c4; }
+.badge {
+  display: inline-block; padding: 4px 10px; border-radius: 999px;
+  font-size: .8rem; font-weight: 700; background: #eef5ff; color: #0b63c4;
+}
 .entry-text { font-size: .98rem; color: #333; }
 .entry-meta { font-size: .8rem; color: #666; }
 .entry-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -55,11 +64,30 @@ input:focus, select:focus { outline: none; border-color: #0078d7; box-shadow: 0 
 .entry-edit-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .entry-edit-row input, .entry-edit-row select { max-width: 280px; }
 
+/* ===== Badge color variants ===== */
+.badge.general { background: #edf2ff; color: #2c3e94; }
+.badge.idea { background: #fff7e6; color: #b35a00; }
+.badge.feedback { background: #eafaf1; color: #1a7f4b; }
+.badge.recipes { background: #ffeaea; color: #b33a3a; }
+.badge.date-night { background: #f6e6ff; color: #6f2dbd; }
+.badge.dances { background: #e6f7ff; color: #0b63c4; }
+
 /* ===== Dark Mode ===== */
 body.dark-mode { background: #1e1e1e; color: #f4f4f9; }
 body.dark-mode section { background: #2b2b2b; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+body.dark-mode .results-info { color: #bdbdbd; }
 body.dark-mode .entry-card { background: #222831; border-color: #3a4a5f; }
-body.dark-mode .badge { background: #11324d; color: #cce7ff; }
+body.dark-mode .entry-text { color: #e9eef6; }
+body.dark-mode .entry-meta { color: #b8c1ce; }
+
 body.dark-mode input, body.dark-mode select { background: #333; color: #fff; border: 1px solid #666; }
 body.dark-mode .btn-ghost { color: #cce7ff; border-color: #3a4a5f; }
 body.dark-mode .btn-ghost:hover { background: #2a3a51; border-color: #44607e; }
+
+/* Tweak badge shades in dark mode (subtle) */
+body.dark-mode .badge.general { background: #1f2740; color: #a9b5ff; }
+body.dark-mode .badge.idea { background: #3b2d16; color: #ffd08a; }
+body.dark-mode .badge.feedback { background: #163026; color: #8be0b9; }
+body.dark-mode .badge.recipes { background: #3a1f1f; color: #ffb3b3; }
+body.dark-mode .badge.date-night { background: #2a1f38; color: #d4b5ff; }
+body.dark-mode .badge.dances { background: #153347; color: #9ed4ff; }
