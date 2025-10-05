@@ -16,6 +16,7 @@
     <!-- Greeting -->
     <section>
       <h2>👋 Greeting</h2>
+      <input type="text" id="nameInput" placeholder="Enter your name..." />
       <button id="greetButton">Say Hi</button>
       <p id="greetMessage"></p>
     </section>
@@ -42,15 +43,18 @@
           <option value="General">General</option>
           <option value="Idea">Idea</option>
           <option value="Feedback">Feedback</option>
+          <option value="Recipes">Recipes</option>
+          <option value="Date Night">Date Night</option>
+          <option value="Dances">Dances</option>
         </select>
         <button type="submit">Add Entry</button>
       </form>
     </section>
 
-    <!-- Entry List -->
+    <!-- Entry List (Interactive) -->
     <section>
       <h2>📋 All Entries</h2>
-      <ul id="entryList"></ul>
+      <ul id="entryList" class="entry-list"></ul>
     </section>
   </main>
 

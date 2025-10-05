@@ -1,4 +1,6 @@
 /* ===== Base Styles ===== */
+* { box-sizing: border-box; }
+
 body {
   font-family: Arial, sans-serif;
   margin: 0;
@@ -8,80 +10,137 @@ body {
   transition: background 0.3s, color 0.3s;
 }
 
-h1, h2 {
-  color: #444;
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
 }
+
+h1, h2 { color: #444; margin: 0 0 10px; }
 
 section {
   margin-bottom: 20px;
-  padding: 15px;
-  border-radius: 10px;
+  padding: 16px;
+  border-radius: 12px;
   background: #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  transition: background 0.3s, color 0.3s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
 /* ===== Buttons ===== */
 button {
-  padding: 10px 15px;
-  margin: 5px 0;
+  padding: 10px 14px;
   border: none;
   border-radius: 8px;
   background-color: #0078d7;
-  color: white;
-  font-size: 1rem;
+  color: #fff;
+  font-size: 0.95rem;
   cursor: pointer;
-  transition: background 0.3s, transform 0.2s;
+  transition: background 0.25s, transform 0.15s;
 }
 
-button:hover {
-  background-color: #005a9e;
-  transform: scale(1.05);
+button:hover { background-color: #005a9e; }
+button:active { transform: scale(0.97); }
+
+/* Secondary/ghost buttons */
+.btn-ghost {
+  background: transparent;
+  color: #0078d7;
+  border: 1px solid #cfe6fb;
+}
+.btn-ghost:hover {
+  background: #eaf4ff;
+  color: #005a9e;
+  border-color: #b7dbff;
 }
 
-button:active {
-  transform: scale(0.95);
-}
+/* Danger buttons */
+.btn-danger { background: #d9534f; }
+.btn-danger:hover { background: #c43f3b; }
+
+/* Success */
+.btn-success { background: #2ea44f; }
+.btn-success:hover { background: #248a40; }
 
 /* ===== Inputs & Dropdowns ===== */
 input, select {
-  padding: 10px;
+  padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid #ccc;
   font-size: 1rem;
-  margin-top: 5px;
-  margin-bottom: 10px;
+  margin: 6px 8px 6px 0;
+  max-width: 420px;
   width: 100%;
-  max-width: 400px;
-  box-sizing: border-box;
-  transition: all 0.2s ease-in-out;
+  transition: border 0.2s, box-shadow 0.2s;
 }
 
-/* Input focus */
 input:focus, select:focus {
   outline: none;
   border-color: #0078d7;
-  box-shadow: 0 0 6px rgba(0, 120, 215, 0.4);
-}
-
-/* Dropdown hover */
-select:hover {
-  border-color: #0078d7;
-  box-shadow: 0 0 4px rgba(0, 120, 215, 0.3);
+  box-shadow: 0 0 6px rgba(0,120,215,0.25);
 }
 
 /* ===== Entry List ===== */
-#entryList {
+.entry-list {
   list-style: none;
   padding: 0;
+  margin: 0;
 }
 
-#entryList li {
-  padding: 8px;
-  margin: 5px 0;
-  background: #eee;
-  border-radius: 6px;
-  transition: background 0.3s;
+.entry-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  margin: 10px 0;
+  border-radius: 10px;
+  background: #f9fbff;
+  border: 1px solid #e5eefc;
+}
+
+.entry-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: #eef5ff;
+  color: #0b63c4;
+}
+
+.entry-text {
+  font-size: 0.98rem;
+  color: #333;
+}
+
+.entry-meta {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.entry-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Inline editor */
+.entry-edit-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.entry-edit-row input,
+.entry-edit-row select {
+  max-width: 280px;
 }
 
 /* ===== Dark Mode ===== */
@@ -91,33 +150,32 @@ body.dark-mode {
 }
 
 body.dark-mode section {
-  background: #2c2c2c;
-  color: #f4f4f9;
+  background: #2b2b2b;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
 }
 
-body.dark-mode button {
-  background-color: #00aaff;
-  color: #fff;
+body.dark-mode .entry-card {
+  background: #222831;
+  border-color: #3a4a5f;
 }
 
-body.dark-mode button:hover {
-  background-color: #008ecc;
+body.dark-mode .badge {
+  background: #11324d;
+  color: #cce7ff;
 }
 
-/* Inputs & dropdowns in dark mode */
 body.dark-mode input,
 body.dark-mode select {
-  background-color: #333;
+  background: #333;
   color: #fff;
   border: 1px solid #666;
 }
 
-body.dark-mode input:focus,
-body.dark-mode select:focus {
-  border-color: #00aaff;
-  box-shadow: 0 0 6px rgba(0, 170, 255, 0.4);
+body.dark-mode .btn-ghost {
+  color: #cce7ff;
+  border-color: #3a4a5f;
 }
-
-body.dark-mode #entryList li {
-  background: #444;
+body.dark-mode .btn-ghost:hover {
+  background: #2a3a51;
+  border-color: #44607e;
 }
