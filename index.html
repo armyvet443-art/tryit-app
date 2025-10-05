@@ -2,85 +2,59 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Try It App 🚀</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Try It App</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="toolbar">
-    <h1>Try It App 🚀</h1>
-    <div class="toolbar-right">
-      <button id="darkModeToggle" class="btn">🌙 Dark</button>
-      <input id="searchInput" type="search" placeholder="Search entries…"/>
-      <select id="filterCategory">
-        <option value="">All</option>
-        <option value="Food">Food</option>
-        <option value="Product">Product</option>
-        <option value="Travel">Travel</option>
-        <option value="Fitness">Fitness</option>
-        <option value="Recipes">Recipes</option>
-        <option value="Date Night">Date Night</option>
-        <option value="Dances">Dances</option>
-      </select>
-      <button id="clearFilters" class="btn">Clear Filters</button>
-    </div>
+  <header>
+    <h1>⭐ Try It App</h1>
+    <p>Share and track what you’re trying today!</p>
   </header>
 
-  <main class="card">
-    <h2>Add an Entry</h2>
-    <form id="entryForm">
-      <div class="row">
-        <div>
-          <label for="entryTitle">Title</label>
-          <input id="entryTitle" type="text" required />
-        </div>
-        <div>
-          <label for="entryCategory">Category</label>
-          <select id="entryCategory" required>
-        <option value="Food">Food</option>
-        <option value="Product">Product</option>
-        <option value="Travel">Travel</option>
-        <option value="Fitness">Fitness</option>
-        <option value="Recipes">Recipes</option>
-        <option value="Date Night">Date Night</option>
-        <option value="Dances">Dances</option>
-          </select>
-        </div>
-      </div>
+  <main>
+    <!-- --- Controls --- -->
+    <section id="controls">
+      <button id="funButton">⭐ Count Clicks</button>
+      <span>Clicks: <span id="clickCount">0</span></span>
 
-      <label for="entryText">What did you try?</label>
-      <textarea id="entryText" rows="3" placeholder="Write a quick note…" required></textarea>
+      <button id="colorButton">🎨 Random Color</button>
+      <button id="greetButton">👋 Greet</button>
+      <span id="greetMessage"></span>
 
-      <div class="row">
-        <div>
-          <label for="entryRating">Rating</label>
-          <select id="entryRating" required>
-            <option value="5">⭐⭐⭐⭐⭐ (5)</option>
-            <option value="4">⭐⭐⭐⭐ (4)</option>
-            <option value="3">⭐⭐⭐ (3)</option>
-            <option value="2">⭐⭐ (2)</option>
-            <option value="1">⭐ (1)</option>
-          </select>
-        </div>
-        <div>
-          <label>&nbsp;</label>
-          <button class="btn" type="submit">Add Entry</button>
-        </div>
-      </div>
-    </form>
+      <button id="darkModeToggle">🌙 Toggle Dark Mode</button>
+      <button id="exportBtn" type="button">💾 Export Entries</button>
+      <button id="clearAllBtn" type="button">🗑️ Clear All</button>
+    </section>
+
+    <hr />
+
+    <!-- --- Entry Form --- -->
+    <section id="entrySection">
+      <form id="entryForm">
+        <input
+          id="entryInput"
+          type="text"
+          placeholder="What are you trying today?"
+          required
+        />
+        <select id="categorySelect">
+          <option value="Health">Health</option>
+          <option value="Travel">Travel</option>
+          <option value="Food">Food</option>
+          <option value="Tech">Tech</option>
+          <option value="Other" selected>Other</option>
+        </select>
+        <button type="submit">Add Entry</button>
+      </form>
+
+      <ul id="entryList"></ul>
+    </section>
   </main>
 
-  <section class="card entries">
-    <div class="toolbar">
-      <h2>Entries</h2>
-      <div>
-        <button id="clearAll" class="btn btn-danger">Clear All</button>
-      </div>
-    </div>
-    <div id="entries-list"></div>
-  </section>
-
-  <footer id="site-footer">Made with ❤️ in Try It App</footer>
+  <footer>
+    <p>Made with 💡 by the Try It Team</p>
+  </footer>
 
   <script src="script.js"></script>
 </body>
