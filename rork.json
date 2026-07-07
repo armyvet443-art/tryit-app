@@ -1,0 +1,10 @@
+{
+  "apps": [
+    {
+      "name": "TryIt",
+      "path": "tryit",
+      "framework": "react-native"
+    }
+  ],
+  "$schema": "https://rork.com/schema/rork.json"
+}
