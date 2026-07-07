@@ -4,11 +4,15 @@ import { createClient } from "@supabase/supabase-js";
 
 /**
  * Existing TryIt Supabase project (same backend as the original app).
- * The anon key is a public client key protected by RLS policies.
+ * The publishable anon key is a public client key protected by RLS policies.
+ * Values come from EXPO_PUBLIC_* env vars with hardcoded fallbacks.
  */
-const SUPABASE_URL = "https://vhodwfkxvodppfgmtmdi.supabase.co";
+const SUPABASE_URL =
+  process.env.EXPO_PUBLIC_SUPABASE_URL ??
+  "https://vhodwfkxvodppfgmtmdi.supabase.co";
 const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZob2R3Zmt4dm9kcHBmZ210bWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxOTk0MDAsImV4cCI6MjA5Mzc3NTQwMH0.JcXTo7N77vjH3lnZ2z5T2q2Tvr79eE-V09uaK2-UMKM";
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+  "sb_publishable_Msp-8Geaixn3qs-Vq8d8Yw_52KOfnpg";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {

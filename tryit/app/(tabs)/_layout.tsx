@@ -1,11 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { BlurView } from "expo-blur";
 import { Tabs } from "expo-router";
-import { Bell, Compass, Home, PlusSquare, User } from "lucide-react-native";
-import React from "react";
+import { Bell, Compass, Home, MessageCircle, PlusSquare, User } from "lucide-react-native";
+import { Platform } from "react-native";
 
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { getUnreadNotificationCount } from "@/services/tryit-service";
+import { useQuery } from "@tanstack/react-query";
 
 export default function TabLayout() {
   const { userId } = useAuth();
@@ -25,11 +26,37 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors.flameOrange,
         tabBarInactiveTintColor: Colors.inactiveIcon,
         tabBarStyle: {
-          backgroundColor: Colors.background,
+          position: "absolute",
+          backgroundColor: Platform.OS === "web" ? "rgba(15,15,15,0.85)" : "transparent",
           borderTopColor: Colors.border,
+          borderTopWidth: 1,
+          height: 64,
+          paddingBottom: 8,
+          paddingTop: 6,
+          elevation: 0,
+        },
+        tabBarBackground: () =>
+          Platform.OS === "web" ? null : (
+            <BlurView
+              intensity={60}
+              tint="dark"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+              }}
+            />
+          ),
+        tabBarLabelStyle: {
+          fontFamily: "Sora_600SemiBold",
+          fontSize: 10,
+          marginTop: 2,
         },
         headerStyle: { backgroundColor: Colors.background },
         headerTintColor: Colors.text,
+        headerTitleStyle: { fontFamily: "Sora_700Bold" },
         headerShadowVisible: false,
         headerShown: false,
       }}
@@ -53,6 +80,13 @@ export default function TabLayout() {
         options={{
           title: "Create",
           tabBarIcon: ({ color }) => <PlusSquare size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: "Messages",
+          tabBarIcon: ({ color }) => <MessageCircle size={24} color={color} />,
         }}
       />
       <Tabs.Screen
