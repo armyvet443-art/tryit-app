@@ -158,13 +158,13 @@ export async function upsertReaction(
 ): Promise<void> {
   const params = {
     p_post_id: postId,
-    p_reaction_type: reaction,
+    p_reaction: reaction,
     p_user_id: userId,
     p_guest_id: userId ? null : guestId,
   };
   console.log("[upsertReaction] calling RPC with:", {
     p_post_id: params.p_post_id,
-    p_reaction_type: params.p_reaction_type,
+    p_reaction: params.p_reaction,
     p_user_id: params.p_user_id,
     p_guest_id: params.p_guest_id,
   });

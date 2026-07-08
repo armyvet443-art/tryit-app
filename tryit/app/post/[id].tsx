@@ -405,6 +405,9 @@ export default function PostDetailScreen() {
                 onPress={() => handleReact(type)}
               >
                 <Text style={styles.reactionEmoji}>{meta.emoji}</Text>
+                <Text style={[styles.reactionLabel, selected && { color }]} numberOfLines={1}>
+                  {meta.label}
+                </Text>
                 <Text style={[styles.reactionCount, selected && { color }]}>
                   {formatCount(counts[type])}
                 </Text>
@@ -616,10 +619,10 @@ const styles = StyleSheet.create({
   },
   reactionPill: {
     flex: 1,
-    flexDirection: "row",
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
+    gap: 2,
     paddingVertical: 9,
     borderRadius: 12,
     backgroundColor: Colors.surfaceVariant,
@@ -627,12 +630,17 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   reactionEmoji: {
-    fontSize: 15,
+    fontSize: 14,
+  },
+  reactionLabel: {
+    color: Colors.mutedText,
+    fontSize: 10,
+    fontWeight: "600" as const,
   },
   reactionCount: {
     color: Colors.mutedText,
-    fontSize: 12,
-    fontWeight: "600" as const,
+    fontSize: 11,
+    fontWeight: "700" as const,
   },
   actionsRow: {
     flexDirection: "row",
