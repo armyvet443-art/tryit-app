@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { MessageCircle } from "lucide-react-native";
-import React, { useCallback } from "react";
+import { Grid3x3, MessageCircle } from "lucide-react-native";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -23,10 +23,13 @@ import {
   getFollowingIds,
   getOrCreateConversation,
   getProfile,
+  getTriedPosts,
   getUserPosts,
 } from "@/services/tryit-service";
 import type { TryPost, UserProfile } from "@/types/models";
 import { formatCount } from "@/utils/format";
+
+type TabKey = "posts" | "tried";
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,6 +38,7 @@ export default function UserProfileScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const tileSize = (width - 8) / 3;
+  const [activeTab, setActiveTab] = useState<TabKey>("posts");
 
   const profileQuery = useQuery<UserProfile | null>({
     queryKey: ["profile", targetId],
@@ -48,13 +52,19 @@ export default function UserProfileScreen() {
     enabled: targetId.length > 0,
   });
 
+  const triedQuery = useQuery<TryPost[]>({
+    queryKey: ["triedPosts", targetId],
+    queryFn: () => getTriedPosts(targetId),
+    enabled: targetId.length > 0,
+  });
+
   const followingQuery = useQuery<Set<string>>({
     queryKey: ["followingIds", userId],
     queryFn: () => getFollowingIds(userId as string),
     enabled: userId !== null,
   });
 
-  const handleMessage = useCallback(async () => {
+  const handleMessage = async () => {
     if (!userId) {
       router.push("/auth/login");
       return;
@@ -68,7 +78,7 @@ export default function UserProfileScreen() {
     } catch (e) {
       console.log("[message] failed", e);
     }
-  }, [userId, targetId, router, profileQuery.data]);
+  };
 
   const profile = profileQuery.data;
 
@@ -88,10 +98,13 @@ export default function UserProfileScreen() {
     );
   }
 
+  const isOwn = profile.id === userId;
+  const tabData = activeTab === "posts" ? (postsQuery.data ?? []) : (triedQuery.data ?? []);
+
   const header = (
     <View>
       {profile.cover_url ? (
-        <Image source={{ uri: profile.cover_url }} style={styles.cover} contentFit="cover" />
+        <Image source={{ uri: profile.cover_url }} style={styles.cover} contentFit="cover" cachePolicy="memory-disk" />
       ) : (
         <LinearGradient colors={[Colors.flameOrange, "#992F00"]} style={styles.cover} />
       )}
@@ -101,13 +114,21 @@ export default function UserProfileScreen() {
             <Avatar uri={profile.avatar_url} name={profile.display_name} size={84} />
           </View>
           <View style={styles.headerButtons}>
-            <FollowButton
-              targetUserId={profile.id}
-              isFollowing={followingQuery.data?.has(profile.id) ?? false}
-            />
-            <TouchableOpacity style={styles.messageButton} onPress={handleMessage} testID="message-user-button">
-              <MessageCircle size={18} color={Colors.text} />
-            </TouchableOpacity>
+            {isOwn ? (
+              <TouchableOpacity style={styles.outlineButton} onPress={() => router.push("/edit-profile")} testID="edit-profile-button">
+                <Text style={styles.outlineButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+            ) : (
+              <FollowButton
+                targetUserId={profile.id}
+                isFollowing={followingQuery.data?.has(profile.id) ?? false}
+              />
+            )}
+            {!isOwn ? (
+              <TouchableOpacity style={styles.messageButton} onPress={handleMessage} testID="message-user-button">
+                <MessageCircle size={18} color={Colors.text} />
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
 
@@ -137,16 +158,40 @@ export default function UserProfileScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Tries</Text>
+        {/* Tabs */}
+        <View style={styles.tabsRow}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "posts" && styles.tabActive]}
+            onPress={() => setActiveTab("posts")}
+            testID="tab-posts"
+          >
+            <Grid3x3 size={18} color={activeTab === "posts" ? Colors.flameOrange : Colors.mutedText} />
+            <Text style={[styles.tabText, activeTab === "posts" && styles.tabTextActive]}>Posts</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "tried" && styles.tabActive]}
+            onPress={() => setActiveTab("tried")}
+            testID="tab-tried"
+          >
+            <Text style={[styles.tabEmoji, activeTab === "tried" && styles.tabTextActive]}>🔥</Text>
+            <Text style={[styles.tabText, activeTab === "tried" && styles.tabTextActive]}>Tried</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
+
+  const isLoading = activeTab === "posts" ? postsQuery.isLoading : triedQuery.isLoading;
+  const emptyText =
+    activeTab === "posts"
+      ? { emoji: "📸", title: "No posts yet" }
+      : { emoji: "🔥", title: "Nothing tried yet" };
 
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: profile.display_name }} />
       <FlatList
-        data={postsQuery.data ?? []}
+        data={tabData}
         keyExtractor={(item) => item.id}
         numColumns={3}
         ListHeaderComponent={header}
@@ -160,6 +205,7 @@ export default function UserProfileScreen() {
                 source={{ uri: item.thumbnail_url ?? item.media_url }}
                 style={styles.gridImage}
                 contentFit="cover"
+                cachePolicy="memory-disk"
               />
             ) : (
               <View style={[styles.gridImage, styles.gridPlaceholder]}>
@@ -170,7 +216,7 @@ export default function UserProfileScreen() {
             )}
           </TouchableOpacity>
         )}
-        ListEmptyComponent={<EmptyState emoji="📸" title="No Tries yet" />}
+        ListEmptyComponent={isLoading ? null : <EmptyState emoji={emptyText.emoji} title={emptyText.title} />}
         contentContainerStyle={{ paddingBottom: 24 }}
       />
     </View>
@@ -209,6 +255,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     alignItems: "center",
+  },
+  outlineButton: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+  },
+  outlineButtonText: {
+    color: Colors.text,
+    fontSize: 13,
+    fontWeight: "600" as const,
   },
   messageButton: {
     padding: 8,
@@ -262,12 +320,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  sectionTitle: {
-    color: Colors.text,
-    fontSize: 16,
-    fontWeight: "800" as const,
+  tabsRow: {
+    flexDirection: "row",
     marginTop: 20,
     marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  tabActive: {
+    borderBottomColor: Colors.flameOrange,
+  },
+  tabText: {
+    color: Colors.mutedText,
+    fontSize: 14,
+    fontWeight: "700" as const,
+  },
+  tabTextActive: {
+    color: Colors.flameOrange,
+  },
+  tabEmoji: {
+    fontSize: 15,
   },
   gridImage: {
     width: "100%",

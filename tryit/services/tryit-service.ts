@@ -289,6 +289,20 @@ export async function addComment(postId: string, userId: string, content: string
   if (error) throw error;
 }
 
+/** Reply to a comment (sets parent_id). Uses the same comments table — no schema change. */
+export async function addReply(postId: string, parentId: string, userId: string, content: string): Promise<void> {
+  const { error } = await supabase
+    .from("comments")
+    .insert({ post_id: postId, parent_id: parentId, user_id: userId, content });
+  if (error) throw error;
+}
+
+/** Delete a comment — RLS ensures only the owner can delete. */
+export async function deleteComment(commentId: string, userId: string): Promise<void> {
+  const { error } = await supabase.from("comments").delete().eq("id", commentId).eq("user_id", userId);
+  if (error) throw error;
+}
+
 // ─── Follows ──────────────────────────────────────────────────────────────
 
 export async function getFollowingIds(userId: string): Promise<Set<string>> {
@@ -356,6 +370,24 @@ export async function getUserPosts(userId: string): Promise<TryPost[]> {
     .from("posts")
     .select("*")
     .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return attachAuthors((data ?? []) as Record<string, unknown>[]);
+}
+
+/** Posts the user has marked as Tried — joins tried_this with posts. */
+export async function getTriedPosts(userId: string): Promise<TryPost[]> {
+  const { data: triedRows, error: triedError } = await supabase
+    .from("tried_this")
+    .select("post_id")
+    .eq("user_id", userId);
+  if (triedError) throw triedError;
+  const postIds = ((triedRows ?? []) as Record<string, unknown>[]).map((r) => String(r.post_id));
+  if (postIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .in("id", postIds)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return attachAuthors((data ?? []) as Record<string, unknown>[]);
@@ -522,6 +554,18 @@ export async function uploadAvatar(base64: string, extension: string, userId: st
   return supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
 }
 
+/** Upload cover photo to the covers storage bucket (RLS-protected). */
+export async function uploadCover(base64: string, extension: string, userId: string): Promise<string> {
+  const ext = extension.toLowerCase() === "png" ? "png" : "jpg";
+  const contentType = ext === "png" ? "image/png" : "image/jpeg";
+  const path = `${userId}/cover-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("covers")
+    .upload(path, decode(base64), { contentType, upsert: true });
+  if (error) throw error;
+  return supabase.storage.from("covers").getPublicUrl(path).data.publicUrl;
+}
+
 // ─── Posting ──────────────────────────────────────────────────────────────
 
 export async function createPost(input: {
@@ -549,4 +593,44 @@ export async function createPost(input: {
 export async function deleteAccount(userId: string): Promise<void> {
   const { error } = await supabase.rpc("delete_user_account", { p_user_id: userId });
   if (error) throw error;
+}
+
+// ─── Guest → User Migration ───────────────────────────────────────────────
+
+/**
+ * Fetch guest reactions for migration. Re-reads the reactions table via
+ * the guest_id column so we can re-submit them as user reactions on login.
+ */
+export async function getGuestReactionsForMigration(
+  guestId: string,
+): Promise<Array<{ post_id: string; reaction_type: ReactionType }>> {
+  const { data, error } = await supabase
+    .from("reactions")
+    .select("post_id, reaction_type")
+    .eq("guest_id", guestId)
+    .is("user_id", null);
+  if (error) return [];
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    post_id: String(r.post_id),
+    reaction_type: String(r.reaction_type) as ReactionType,
+  }));
+}
+
+/**
+ * Migrate guest reactions to the logged-in user by re-calling upsert_reaction
+ * for each. The RPC handles the upsert so duplicates are merged, and RLS
+ * allows the authenticated user to delete their old guest rows.
+ */
+export async function migrateGuestData(guestId: string, userId: string): Promise<number> {
+  const guestReactions = await getGuestReactionsForMigration(guestId);
+  let migrated = 0;
+  for (const r of guestReactions) {
+    try {
+      await upsertReaction(r.post_id, r.reaction_type, userId, guestId);
+      migrated++;
+    } catch (e) {
+      console.log("[migration] reaction failed", r.post_id, e);
+    }
+  }
+  return migrated;
 }

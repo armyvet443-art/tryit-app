@@ -10,17 +10,20 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  View,
 } from "react-native";
 
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 
 export default function LoginScreen() {
-  const { signIn } = useAuth();
+  const { signIn, signInWithMagicLink } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [busy, setBusy] = useState<boolean>(false);
+  const [magicBusy, setMagicBusy] = useState<boolean>(false);
+  const [showMagicLink, setShowMagicLink] = useState<boolean>(false);
 
   const handleLogin = async () => {
     if (email.trim().length === 0 || password.length === 0) {
@@ -36,6 +39,27 @@ export default function LoginScreen() {
       Alert.alert("Login failed", message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleMagicLink = async () => {
+    if (email.trim().length === 0) {
+      Alert.alert("Missing email", "Enter your email to receive a magic link.");
+      return;
+    }
+    setMagicBusy(true);
+    try {
+      await signInWithMagicLink(email);
+      Alert.alert(
+        "Check your email 📬",
+        "We sent a magic link to your email. Tap it to sign in.",
+        [{ text: "OK", onPress: () => router.dismissAll() }],
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Could not send magic link.";
+      Alert.alert("Error", message);
+    } finally {
+      setMagicBusy(false);
     }
   };
 
@@ -58,26 +82,48 @@ export default function LoginScreen() {
           keyboardType="email-address"
           autoComplete="email"
         />
-        <TextInput
-          testID="login-password"
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor={Colors.inactiveIcon}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+        {!showMagicLink ? (
+          <TextInput
+            testID="login-password"
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor={Colors.inactiveIcon}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+        ) : null}
+
+        {!showMagicLink ? (
+          <TouchableOpacity
+            testID="login-submit"
+            style={[styles.primaryButton, busy && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={busy}
+          >
+            {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Log In</Text>}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            testID="login-magic-link"
+            style={[styles.primaryButton, magicBusy && styles.buttonDisabled]}
+            onPress={handleMagicLink}
+            disabled={magicBusy}
+          >
+            {magicBusy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Send Magic Link</Text>}
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
-          testID="login-submit"
-          style={[styles.primaryButton, busy && styles.buttonDisabled]}
-          onPress={handleLogin}
-          disabled={busy}
+          onPress={() => setShowMagicLink((s) => !s)}
+          testID="toggle-magic-link"
         >
-          {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Log In</Text>}
+          <Text style={styles.magicLinkText}>
+            {showMagicLink ? "Use password instead" : "Sign in with magic link"}
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.replace("/auth/signup")}>
+        <TouchableOpacity onPress={() => router.replace("/auth/signup")} testID="login-to-signup">
           <Text style={styles.linkText}>
             New to TryIt? <Text style={styles.linkAccent}>Create an account</Text>
           </Text>
@@ -138,11 +184,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800" as const,
   },
+  magicLinkText: {
+    color: Colors.neonBlue,
+    fontSize: 13,
+    textAlign: "center",
+    fontWeight: "600" as const,
+  },
   linkText: {
     color: Colors.mutedText,
     fontSize: 14,
     textAlign: "center",
-    marginTop: 12,
+    marginTop: 8,
   },
   linkAccent: {
     color: Colors.neonBlue,

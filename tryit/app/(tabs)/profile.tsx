@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { Settings, User } from "lucide-react-native";
-import React from "react";
+import { Grid3x3, Settings, User } from "lucide-react-native";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -19,9 +19,11 @@ import Avatar from "@/components/Avatar";
 import EmptyState from "@/components/EmptyState";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
-import { getUserPosts } from "@/services/tryit-service";
+import { getTriedPosts, getUserPosts } from "@/services/tryit-service";
 import type { TryPost } from "@/types/models";
 import { formatCount } from "@/utils/format";
+
+type TabKey = "posts" | "tried";
 
 export default function ProfileScreen() {
   const { userId, profile, isProfileLoading } = useAuth();
@@ -29,10 +31,17 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const tileSize = (width - 8) / 3;
+  const [activeTab, setActiveTab] = useState<TabKey>("posts");
 
   const postsQuery = useQuery<TryPost[]>({
     queryKey: ["userPosts", userId],
     queryFn: () => getUserPosts(userId as string),
+    enabled: userId !== null,
+  });
+
+  const triedQuery = useQuery<TryPost[]>({
+    queryKey: ["triedPosts", userId],
+    queryFn: () => getTriedPosts(userId as string),
     enabled: userId !== null,
   });
 
@@ -44,7 +53,7 @@ export default function ProfileScreen() {
         <Text style={styles.authSubtitle}>
           Log in to track your streaks, Tries, followers and saved posts.
         </Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => router.push("/auth/login")}>
+        <TouchableOpacity style={styles.primaryButton} onPress={() => router.push("/auth/login")} testID="profile-login-cta">
           <Text style={styles.primaryButtonText}>Log In</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push("/auth/signup")}>
@@ -62,11 +71,13 @@ export default function ProfileScreen() {
     );
   }
 
+  const tabData = activeTab === "posts" ? (postsQuery.data ?? []) : (triedQuery.data ?? []);
+
   const header = (
     <View>
       {/* Cover */}
       {profile.cover_url ? (
-        <Image source={{ uri: profile.cover_url }} style={styles.cover} contentFit="cover" />
+        <Image source={{ uri: profile.cover_url }} style={styles.cover} contentFit="cover" cachePolicy="memory-disk" />
       ) : (
         <LinearGradient colors={[Colors.flameOrange, "#992F00"]} style={styles.cover} />
       )}
@@ -77,10 +88,10 @@ export default function ProfileScreen() {
             <Avatar uri={profile.avatar_url} name={profile.display_name} size={84} />
           </View>
           <View style={styles.headerButtons}>
-            <TouchableOpacity style={styles.outlineButton} onPress={() => router.push("/edit-profile")}>
+            <TouchableOpacity style={styles.outlineButton} onPress={() => router.push("/edit-profile")} testID="edit-profile-button">
               <Text style={styles.outlineButtonText}>Edit Profile</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={() => router.push("/settings")}>
+            <TouchableOpacity style={styles.iconButton} onPress={() => router.push("/settings")} testID="settings-button">
               <Settings size={20} color={Colors.text} />
             </TouchableOpacity>
           </View>
@@ -134,15 +145,39 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>My Tries</Text>
+        {/* Tabs */}
+        <View style={styles.tabsRow}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "posts" && styles.tabActive]}
+            onPress={() => setActiveTab("posts")}
+            testID="tab-posts"
+          >
+            <Grid3x3 size={18} color={activeTab === "posts" ? Colors.flameOrange : Colors.mutedText} />
+            <Text style={[styles.tabText, activeTab === "posts" && styles.tabTextActive]}>Posts</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "tried" && styles.tabActive]}
+            onPress={() => setActiveTab("tried")}
+            testID="tab-tried"
+          >
+            <Text style={[styles.tabEmoji, activeTab === "tried" && styles.tabTextActive]}>🔥</Text>
+            <Text style={[styles.tabText, activeTab === "tried" && styles.tabTextActive]}>Tried</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
 
+  const isLoading = activeTab === "posts" ? postsQuery.isLoading : triedQuery.isLoading;
+  const emptyText =
+    activeTab === "posts"
+      ? { emoji: "📸", title: "No Tries yet", subtitle: "Post your first Try from the Create tab." }
+      : { emoji: "🔥", title: "Nothing tried yet", subtitle: "Tap 'I Tried This' on any post to save it here." };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <FlatList
-        data={postsQuery.data ?? []}
+        data={tabData}
         keyExtractor={(item) => item.id}
         numColumns={3}
         ListHeaderComponent={header}
@@ -156,6 +191,7 @@ export default function ProfileScreen() {
                 source={{ uri: item.thumbnail_url ?? item.media_url }}
                 style={styles.gridImage}
                 contentFit="cover"
+                cachePolicy="memory-disk"
               />
             ) : (
               <View style={[styles.gridImage, styles.gridPlaceholder]}>
@@ -167,7 +203,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          <EmptyState emoji="📸" title="No Tries yet" subtitle="Post your first Try from the Create tab." />
+          isLoading ? null : <EmptyState emoji={emptyText.emoji} title={emptyText.title} subtitle={emptyText.subtitle} />
         }
         contentContainerStyle={styles.listContent}
       />
@@ -305,12 +341,36 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: Colors.border,
   },
-  sectionTitle: {
-    color: Colors.text,
-    fontSize: 16,
-    fontWeight: "800" as const,
+  tabsRow: {
+    flexDirection: "row",
     marginTop: 20,
     marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  tabActive: {
+    borderBottomColor: Colors.flameOrange,
+  },
+  tabText: {
+    color: Colors.mutedText,
+    fontSize: 14,
+    fontWeight: "700" as const,
+  },
+  tabTextActive: {
+    color: Colors.flameOrange,
+  },
+  tabEmoji: {
+    fontSize: 15,
   },
   gridImage: {
     width: "100%",

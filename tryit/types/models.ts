@@ -115,3 +115,10 @@ export const CATEGORIES: string[] = [
   "Games",
   "Music",
 ];
+
+/** Media item — a post may have multiple media_url values via a media array. */
+export interface MediaItem {
+  url: string;
+  type: "image" | "video";
+  thumbnail?: string | null;
+}
