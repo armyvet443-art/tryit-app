@@ -21,6 +21,7 @@ import {
   FeedType,
   fetchFeed,
   getFollowingIds,
+  getGuestReactions,
   getMyReactions,
   getSavedSet,
   getTriedSet,
@@ -37,7 +38,7 @@ const FEED_TABS: { key: FeedType; label: string; emoji: string }[] = [
 ];
 
 export default function FeedScreen() {
-  const { userId } = useAuth();
+  const { userId, guestId } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -53,9 +54,12 @@ export default function FeedScreen() {
   const postIdsKey = postIds.join(",");
 
   const reactionsQuery = useQuery<Record<string, ReactionType>>({
-    queryKey: ["myReactions", userId, postIdsKey],
-    queryFn: () => getMyReactions(postIds, userId as string),
-    enabled: userId !== null && postIds.length > 0,
+    queryKey: ["myReactions", userId, guestId, postIdsKey],
+    queryFn: () =>
+      userId
+        ? getMyReactions(postIds, userId)
+        : getGuestReactions(postIds, guestId),
+    enabled: postIds.length > 0 && (userId !== null || guestId.length > 0),
   });
 
   const triedQuery = useQuery<Set<string>>({

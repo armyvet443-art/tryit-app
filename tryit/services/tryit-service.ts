@@ -207,6 +207,26 @@ export async function getGuestReaction(postId: string, guestId: string): Promise
   return String(rows[0].reaction_type) as ReactionType;
 }
 
+/** Fetch guest reactions for multiple posts at once — mirrors getMyReactions for logged-in users. */
+export async function getGuestReactions(
+  postIds: string[],
+  guestId: string,
+): Promise<Record<string, ReactionType>> {
+  if (postIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from("reactions")
+    .select("post_id, reaction_type")
+    .eq("guest_id", guestId)
+    .is("user_id", null)
+    .in("post_id", postIds);
+  if (error) return {};
+  const map: Record<string, ReactionType> = {};
+  (data ?? []).forEach((r: Record<string, unknown>) => {
+    map[String(r.post_id)] = String(r.reaction_type) as ReactionType;
+  });
+  return map;
+}
+
 // ─── Tried This / Saved ───────────────────────────────────────────────────
 
 export async function getTriedSet(postIds: string[], userId: string): Promise<Set<string>> {
