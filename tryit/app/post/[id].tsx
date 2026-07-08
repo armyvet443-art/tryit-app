@@ -184,6 +184,8 @@ export default function PostDetailScreen() {
         try {
           await deleteReaction(postId, userId, guestId);
           queryClient.invalidateQueries({ queryKey: ["myReaction", userId, postId] });
+          queryClient.invalidateQueries({ queryKey: ["post", postId] });
+          queryClient.invalidateQueries({ queryKey: ["myReactions"] });
         } catch (e) {
           console.log("[reaction] delete failed", e);
           setReaction(previous);
@@ -198,6 +200,8 @@ export default function PostDetailScreen() {
       try {
         await upsertReaction(postId, type, userId, guestId);
         queryClient.invalidateQueries({ queryKey: ["myReaction", userId, postId] });
+        queryClient.invalidateQueries({ queryKey: ["post", postId] });
+        queryClient.invalidateQueries({ queryKey: ["myReactions"] });
       } catch (e) {
         console.log("[reaction] upsert failed", e);
         setReaction(previous);

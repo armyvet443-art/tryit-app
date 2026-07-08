@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Bookmark, MapPin, MessageCircle, Share2 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Platform,
   Share,
@@ -46,6 +47,7 @@ export default function PostCard({
 }: PostCardProps) {
   const { userId, guestId } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [reaction, setReaction] = useState<ReactionType | null>(myReaction);
   const [counts, setCounts] = useState<Record<ReactionType, number>>({
@@ -76,6 +78,9 @@ export default function PostCard({
         setCounts(nextCounts);
         try {
           await deleteReaction(post.id, userId, guestId);
+          queryClient.invalidateQueries({ queryKey: ["myReactions"] });
+          queryClient.invalidateQueries({ queryKey: ["myReaction", userId, post.id] });
+          queryClient.invalidateQueries({ queryKey: ["post", post.id] });
         } catch (e) {
           console.log("[reaction] delete failed", e);
           setReaction(previous);
@@ -89,13 +94,16 @@ export default function PostCard({
       setCounts(nextCounts);
       try {
         await upsertReaction(post.id, type, userId, guestId);
+        queryClient.invalidateQueries({ queryKey: ["myReactions"] });
+        queryClient.invalidateQueries({ queryKey: ["myReaction", userId, post.id] });
+        queryClient.invalidateQueries({ queryKey: ["post", post.id] });
       } catch (e) {
         console.log("[reaction] upsert failed", e);
         setReaction(previous);
         setCounts(counts);
       }
     },
-    [reaction, counts, post.id, userId, guestId],
+    [reaction, counts, post.id, userId, guestId, queryClient],
   );
 
   const handleTried = useCallback(async () => {

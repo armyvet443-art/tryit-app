@@ -156,12 +156,20 @@ export async function upsertReaction(
   userId: string | null,
   guestId: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc("upsert_reaction", {
+  const params = {
     p_post_id: postId,
+    p_reaction_type: reaction,
     p_user_id: userId,
-    p_reaction: reaction,
     p_guest_id: userId ? null : guestId,
+  };
+  console.log("[upsertReaction] calling RPC with:", {
+    p_post_id: params.p_post_id,
+    p_reaction_type: params.p_reaction_type,
+    p_user_id: params.p_user_id,
+    p_guest_id: params.p_guest_id,
   });
+  const { data, error } = await supabase.rpc("upsert_reaction", params);
+  console.log("[upsertReaction] RPC response:", { data, error: error?.message ?? null, code: error?.code ?? null });
   if (error) throw error;
 }
 
@@ -170,11 +178,14 @@ export async function deleteReaction(
   userId: string | null,
   guestId: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc("delete_reaction", {
+  const params = {
     p_post_id: postId,
     p_user_id: userId,
     p_guest_id: userId ? null : guestId,
-  });
+  };
+  console.log("[deleteReaction] calling RPC with:", params);
+  const { data, error } = await supabase.rpc("delete_reaction", params);
+  console.log("[deleteReaction] RPC response:", { data, error: error?.message ?? null, code: error?.code ?? null });
   if (error) throw error;
 }
 
