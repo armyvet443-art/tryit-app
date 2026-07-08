@@ -82,6 +82,10 @@ export default function FeedScreen() {
 
   const onRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["feed", feedType, userId] });
+    // Also refresh reaction/tried/saved state so votes persist after pull-to-refresh
+    queryClient.invalidateQueries({ queryKey: ["myReactions"] });
+    queryClient.invalidateQueries({ queryKey: ["triedSet"] });
+    queryClient.invalidateQueries({ queryKey: ["savedSet"] });
   }, [queryClient, feedType, userId]);
 
   const renderItem = useCallback(
