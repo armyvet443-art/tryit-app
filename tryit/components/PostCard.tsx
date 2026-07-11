@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Bookmark, MapPin, MessageCircle, Share2 } from "lucide-react-native";
+import { Bookmark, MapPin, MessageCircle, Play, Share2 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -184,6 +184,13 @@ export default function PostCard({
             contentFit="cover"
             transition={200}
           />
+          {post.media_type === "video" ? (
+            <View style={styles.playOverlay} testID={`video-play-${post.id}`}>
+              <View style={styles.playCircle}>
+                <Play size={26} color="#FFFFFF" fill="#FFFFFF" />
+              </View>
+            </View>
+          ) : null}
           {post.category ? (
             <View style={styles.categoryChip}>
               <Text style={styles.categoryText}>{post.category}</Text>
@@ -331,6 +338,25 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 340,
     backgroundColor: Colors.surfaceVariant,
+  },
+  playOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(15,15,15,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.3)",
   },
   categoryChip: {
     position: "absolute",

@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Camera, ImagePlus } from "lucide-react-native";
+import { Camera, ImagePlus, Video as VideoIcon } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
-import { createPost, uploadPostMedia } from "@/services/tryit-service";
+import { createPost, uploadPostMedia, uploadPostVideo } from "@/services/tryit-service";
 import { CATEGORIES } from "@/types/models";
 
 export default function CreateScreen() {
@@ -36,22 +36,38 @@ export default function CreateScreen() {
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageExt, setImageExt] = useState<string>("jpg");
+  const [isVideo, setIsVideo] = useState<boolean>(false);
   const [posting, setPosting] = useState<boolean>(false);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
+      mediaTypes: ["images", "videos"],
       quality: 0.8,
       base64: true,
       allowsEditing: true,
       aspect: [4, 3],
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
     });
+    console.log("[pickImage] result:", { canceled: result.canceled, assets: result.assets?.map(a => ({ uri: a.uri, type: a.type, mimeType: a.mimeType })) });
     if (!result.canceled && result.assets.length > 0) {
       const asset = result.assets[0];
+      const assetIsVideo =
+        asset.type === "video" ||
+        asset.mimeType?.startsWith("video/") === true ||
+        /\.(mp4|mov|webm)$/i.test(asset.uri);
+      console.log("[pickImage] asset picked:", { uri: asset.uri, isVideo: assetIsVideo, mimeType: asset.mimeType, type: asset.type });
+      setIsVideo(assetIsVideo);
       setImageUri(asset.uri);
-      setImageBase64(asset.base64 ?? null);
-      const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "jpg";
-      setImageExt(ext === "png" ? "png" : "jpg");
+      if (assetIsVideo) {
+        // Videos are uploaded via file URI (fetch→Blob), not base64
+        setImageBase64(null);
+        const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "mp4";
+        setImageExt(ext === "mov" ? "mov" : "mp4");
+      } else {
+        setImageBase64(asset.base64 ?? null);
+        const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "jpg";
+        setImageExt(ext === "png" ? "png" : "jpg");
+      }
     }
   };
 
@@ -71,14 +87,21 @@ export default function CreateScreen() {
     setPosting(true);
     try {
       let mediaUrl = "";
-      if (imageBase64) {
+      let mediaType: "image" | "video" = "image";
+      if (isVideo && imageUri) {
+        mediaUrl = await uploadPostVideo(imageUri, imageExt, userId);
+        mediaType = "video";
+      } else if (imageBase64) {
         mediaUrl = await uploadPostMedia(imageBase64, imageExt, userId);
+        mediaType = "image";
       }
+      console.log("[handlePost] creating post:", { mediaUrl, mediaType });
       await createPost({
         userId,
         title: title.trim(),
         caption: caption.trim(),
         mediaUrl,
+        mediaType,
         category,
         location: location.trim(),
       });
@@ -88,6 +111,7 @@ export default function CreateScreen() {
       setLocation("");
       setImageBase64(null);
       setImageUri(null);
+      setIsVideo(false);
       queryClient.invalidateQueries({ queryKey: ["feed"] });
       queryClient.invalidateQueries({ queryKey: ["userPosts", userId] });
       Alert.alert("Posted! 🔥", "Your Try is live.");
@@ -127,11 +151,19 @@ export default function CreateScreen() {
 
         <TouchableOpacity style={styles.mediaPicker} onPress={pickImage} testID="pick-image-button">
           {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.mediaPreview} contentFit="cover" />
+            <View style={styles.mediaPreviewWrap}>
+              <Image source={{ uri: imageUri }} style={styles.mediaPreview} contentFit="cover" />
+              {isVideo ? (
+                <View style={styles.videoBadge}>
+                  <VideoIcon size={16} color="#FFFFFF" />
+                  <Text style={styles.videoBadgeText}>VIDEO</Text>
+                </View>
+              ) : null}
+            </View>
           ) : (
             <View style={styles.mediaPlaceholder}>
               <ImagePlus size={36} color={Colors.mutedText} />
-              <Text style={styles.mediaPlaceholderText}>Add a photo</Text>
+              <Text style={styles.mediaPlaceholderText}>Add a photo or video</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -235,10 +267,32 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 16,
   },
+  mediaPreviewWrap: {
+    width: "100%",
+    height: 240,
+  },
   mediaPreview: {
     width: "100%",
     height: 240,
     backgroundColor: Colors.surfaceVariant,
+  },
+  videoBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(15,15,15,0.8)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  videoBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "800" as const,
+    letterSpacing: 0.5,
   },
   mediaPlaceholder: {
     width: "100%",

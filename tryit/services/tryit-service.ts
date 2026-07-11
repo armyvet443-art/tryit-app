@@ -563,6 +563,7 @@ export async function markConversationRead(conversationId: string): Promise<void
 
 // ─── Storage ──────────────────────────────────────────────────────────────
 
+/** Upload an image (base64) to post-media storage. */
 export async function uploadPostMedia(base64: string, extension: string, userId: string): Promise<string> {
   const ext = extension.toLowerCase() === "png" ? "png" : "jpg";
   const contentType = ext === "png" ? "image/png" : "image/jpeg";
@@ -572,6 +573,27 @@ export async function uploadPostMedia(base64: string, extension: string, userId:
     .upload(path, decode(base64), { contentType, upsert: true });
   if (error) throw error;
   return supabase.storage.from("post-media").getPublicUrl(path).data.publicUrl;
+}
+
+/** Upload a video (file URI) to post-media storage. Uses fetch→Blob to avoid base64 memory issues. */
+export async function uploadPostVideo(uri: string, extension: string, userId: string): Promise<string> {
+  const ext = extension.toLowerCase() === "mov" ? "mov" : "mp4";
+  const contentType = ext === "mov" ? "video/quicktime" : "video/mp4";
+  const path = `${userId}/${Date.now()}.${ext}`;
+  console.log("[uploadPostVideo] uploading", { uri, ext, contentType, path });
+  const response = await fetch(uri);
+  const blob = await response.blob();
+  console.log("[uploadPostVideo] blob size", blob.size, "type", blob.type);
+  const { error } = await supabase.storage
+    .from("post-media")
+    .upload(path, blob, { contentType, upsert: true });
+  if (error) {
+    console.log("[uploadPostVideo] upload error", error.message);
+    throw error;
+  }
+  const publicUrl = supabase.storage.from("post-media").getPublicUrl(path).data.publicUrl;
+  console.log("[uploadPostVideo] uploaded to", publicUrl);
+  return publicUrl;
 }
 
 export async function uploadAvatar(base64: string, extension: string, userId: string): Promise<string> {
@@ -604,6 +626,7 @@ export async function createPost(input: {
   title: string;
   caption: string;
   mediaUrl: string;
+  mediaType: "image" | "video";
   category: string;
   location: string;
 }): Promise<void> {
@@ -612,7 +635,7 @@ export async function createPost(input: {
     title: input.title,
     caption: input.caption,
     media_url: input.mediaUrl,
-    media_type: "image",
+    media_type: input.mediaType,
     category: input.category,
     location: input.location,
   });
