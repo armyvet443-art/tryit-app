@@ -3,7 +3,6 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Bookmark, MapPin, MessageCircle, Play, Share2 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   Platform,
   Share,
@@ -26,11 +25,21 @@ import {
 import { REACTION_META, ReactionType, TryPost } from "@/types/models";
 import { formatCount, timeAgo } from "@/utils/format";
 
+type ReactionCounts = Record<ReactionType, number>;
+
+const EMPTY_COUNTS: ReactionCounts = {
+  must_try: 0,
+  worth_it: 0,
+  maybe: 0,
+  not_for_me: 0,
+};
+
 const REACTION_ORDER: ReactionType[] = ["must_try", "worth_it", "maybe", "not_for_me"];
 
 interface PostCardProps {
   post: TryPost;
   myReaction: ReactionType | null;
+  reactionCounts?: ReactionCounts | null;
   tried: boolean;
   saved: boolean;
   isFollowingAuthor: boolean;
@@ -40,6 +49,7 @@ interface PostCardProps {
 export default function PostCard({
   post,
   myReaction,
+  reactionCounts,
   tried,
   saved,
   isFollowingAuthor,
@@ -47,15 +57,16 @@ export default function PostCard({
 }: PostCardProps) {
   const { userId, guestId } = useAuth();
   const router = useRouter();
-  const queryClient = useQueryClient();
 
   const [reaction, setReaction] = useState<ReactionType | null>(myReaction);
-  const [counts, setCounts] = useState<Record<ReactionType, number>>({
-    must_try: post.must_try_count,
-    worth_it: post.worth_it_count,
-    maybe: post.maybe_count,
-    not_for_me: post.not_for_me_count,
-  });
+  const [counts, setCounts] = useState<ReactionCounts>(
+    reactionCounts ?? {
+      must_try: post.must_try_count,
+      worth_it: post.worth_it_count,
+      maybe: post.maybe_count,
+      not_for_me: post.not_for_me_count,
+    },
+  );
   const [isTried, setIsTried] = useState<boolean>(tried);
   const [triedCount, setTriedCount] = useState<number>(post.tried_count);
   const [isSaved, setIsSaved] = useState<boolean>(saved);
@@ -64,6 +75,11 @@ export default function PostCard({
   useEffect(() => setReaction(myReaction), [myReaction]);
   useEffect(() => setIsTried(tried), [tried]);
   useEffect(() => setIsSaved(saved), [saved]);
+  // Sync counts from the shared feed batch when they change and we're not
+  // mid-interaction (reaction === myReaction means no local pending change).
+  useEffect(() => {
+    if (reactionCounts) setCounts(reactionCounts);
+  }, [reactionCounts]);
 
   const totalVotes = REACTION_ORDER.reduce((sum, key) => sum + counts[key], 0);
 
@@ -71,41 +87,23 @@ export default function PostCard({
     async (type: ReactionType) => {
       if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const previous = reaction;
+      // Optimistic update: toggle off if same, otherwise switch.
+      const nextReaction = previous === type ? null : type;
       const nextCounts = { ...counts };
-      if (previous === type) {
-        setReaction(null);
-        nextCounts[type] = Math.max(0, nextCounts[type] - 1);
-        setCounts(nextCounts);
-        try {
-          await deleteReaction(post.id, userId, guestId);
-          queryClient.invalidateQueries({ queryKey: ["myReactions"] });
-          queryClient.invalidateQueries({ queryKey: ["myReaction", userId, post.id] });
-          queryClient.invalidateQueries({ queryKey: ["post", post.id] });
-          queryClient.invalidateQueries({ queryKey: ["feed"] });
-        } catch (e) {
-          console.log("[reaction] delete failed", e);
-          setReaction(previous);
-          setCounts(counts);
-        }
-        return;
-      }
-      setReaction(type);
       if (previous) nextCounts[previous] = Math.max(0, nextCounts[previous] - 1);
-      nextCounts[type] = nextCounts[type] + 1;
+      if (nextReaction) nextCounts[nextReaction] = nextCounts[nextReaction] + 1;
+      setReaction(nextReaction);
       setCounts(nextCounts);
       try {
-        await upsertReaction(post.id, type, userId, guestId);
-        queryClient.invalidateQueries({ queryKey: ["myReactions"] });
-        queryClient.invalidateQueries({ queryKey: ["myReaction", userId, post.id] });
-        queryClient.invalidateQueries({ queryKey: ["post", post.id] });
-        queryClient.invalidateQueries({ queryKey: ["feed"] });
+        const freshCounts = await upsertReaction(post.id, nextReaction, userId, guestId);
+        setCounts(freshCounts);
       } catch (e) {
         console.log("[reaction] upsert failed", e);
         setReaction(previous);
         setCounts(counts);
       }
     },
-    [reaction, counts, post.id, userId, guestId, queryClient],
+    [reaction, counts, post.id, userId, guestId],
   );
 
   const handleTried = useCallback(async () => {

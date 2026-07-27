@@ -155,47 +155,132 @@ export async function fetchPost(postId: string): Promise<TryPost | null> {
 }
 
 // ─── Reactions (Try Meter) ────────────────────────────────────────────────
+// Direct table operations on the `reactions` table — no RPC. This avoids the
+// overloaded `upsert_reaction` function (uuid vs text p_guest_id) and the
+// missing `post_reactions` table reference that caused every vote to fail and
+// counts to revert to 0. Counts are read back from the same table so the UI
+// stays in sync without relying on `posts` counter columns.
 
-export async function upsertReaction(
-  postId: string,
-  reaction: ReactionType,
-  userId: string | null,
-  guestId: string,
-): Promise<void> {
-  // p_guest_id is always TEXT (e.g. "guest_xxx" or UUID string). Pass null for
-  // logged-in users so the RPC's (user_id = p_user_id OR guest_id = p_guest_id)
-  // clause only matches the user's row.
-  const params = {
-    p_post_id: postId,
-    p_reaction_type: reaction,
-    p_user_id: userId,
-    p_guest_id: userId ? null : guestId,
-  };
-  console.log("[upsertReaction] calling RPC with:", {
-    p_post_id: params.p_post_id,
-    p_reaction_type: params.p_reaction_type,
-    p_user_id: params.p_user_id,
-    p_guest_id: params.p_guest_id,
-  });
-  const { data, error } = await supabase.rpc("upsert_reaction", params);
-  console.log("[upsertReaction] RPC response:", { data, error: error?.message ?? null, code: error?.code ?? null });
-  if (error) throw error;
+export type ReactionCounts = Record<ReactionType, number>;
+
+function emptyCounts(): ReactionCounts {
+  return { must_try: 0, worth_it: 0, maybe: 0, not_for_me: 0 };
 }
 
+/** Count reactions grouped by reaction_type for a single post. */
+async function countReactions(postId: string): Promise<ReactionCounts> {
+  const { data, error } = await supabase
+    .from("reactions")
+    .select("reaction_type")
+    .eq("post_id", postId);
+  if (error) {
+    console.log("[countReactions] error", postId, error.message);
+    return emptyCounts();
+  }
+  const counts = emptyCounts();
+  for (const r of (data ?? []) as Record<string, unknown>[]) {
+    const t = String(r.reaction_type) as ReactionType;
+    if (t in counts) counts[t] += 1;
+  }
+  return counts;
+}
+
+/** Delete the existing reaction row for this user/guest on the given post. */
+async function deleteExistingReaction(postId: string, userId: string | null, guestId: string): Promise<void> {
+  if (userId) {
+    const { error } = await supabase
+      .from("reactions")
+      .delete()
+      .eq("post_id", postId)
+      .eq("user_id", userId);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("reactions")
+      .delete()
+      .eq("post_id", postId)
+      .eq("guest_id", guestId)
+      .is("user_id", null);
+    if (error) throw error;
+  }
+}
+
+/**
+ * Set or toggle a reaction. Pass `null` as `reaction` to un-react.
+ * Returns the fresh counts read from the reactions table so callers can render
+ * the result without an extra fetch and without flicker.
+ */
+export async function upsertReaction(
+  postId: string,
+  reaction: ReactionType | null,
+  userId: string | null,
+  guestId: string,
+): Promise<ReactionCounts> {
+  console.log("[upsertReaction] start", { postId, reaction, userId, guestId });
+  await deleteExistingReaction(postId, userId, guestId);
+  if (reaction) {
+    const row: Record<string, unknown> = {
+      post_id: postId,
+      reaction_type: reaction,
+    };
+    if (userId) {
+      row.user_id = userId;
+      row.guest_id = null;
+    } else {
+      row.guest_id = guestId;
+      row.user_id = null;
+    }
+    const { error } = await supabase.from("reactions").insert(row);
+    if (error) {
+      console.log("[upsertReaction] insert error", postId, error.message);
+      throw error;
+    }
+  }
+  const counts = await countReactions(postId);
+  console.log("[upsertReaction] done", postId, counts);
+  return counts;
+}
+
+/** Un-react. Returns fresh counts. */
 export async function deleteReaction(
   postId: string,
   userId: string | null,
   guestId: string,
-): Promise<void> {
-  const params = {
-    p_post_id: postId,
-    p_user_id: userId,
-    p_guest_id: userId ? null : guestId,
-  };
-  console.log("[deleteReaction] calling RPC with:", params);
-  const { data, error } = await supabase.rpc("delete_reaction", params);
-  console.log("[deleteReaction] RPC response:", { data, error: error?.message ?? null, code: error?.code ?? null });
-  if (error) throw error;
+): Promise<ReactionCounts> {
+  console.log("[deleteReaction] start", { postId, userId, guestId });
+  await deleteExistingReaction(postId, userId, guestId);
+  const counts = await countReactions(postId);
+  console.log("[deleteReaction] done", postId, counts);
+  return counts;
+}
+
+/** Batch-fetch reaction counts for many posts (used by the feed). */
+export async function getReactionCountsBatch(
+  postIds: string[],
+): Promise<Record<string, ReactionCounts>> {
+  if (postIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from("reactions")
+    .select("post_id, reaction_type")
+    .in("post_id", postIds);
+  if (error) {
+    console.log("[getReactionCountsBatch] error", error.message);
+    return {};
+  }
+  const map: Record<string, ReactionCounts> = {};
+  for (const id of postIds) map[id] = emptyCounts();
+  for (const r of (data ?? []) as Record<string, unknown>[]) {
+    const pid = String(r.post_id);
+    if (!map[pid]) map[pid] = emptyCounts();
+    const t = String(r.reaction_type) as ReactionType;
+    if (t in map[pid]) map[pid][t] += 1;
+  }
+  return map;
+}
+
+/** Fetch counts for a single post from the reactions table. */
+export async function getReactionCounts(postId: string): Promise<ReactionCounts> {
+  return countReactions(postId);
 }
 
 export async function getMyReactions(
@@ -217,14 +302,19 @@ export async function getMyReactions(
 }
 
 export async function getGuestReaction(postId: string, guestId: string): Promise<ReactionType | null> {
-  const { data, error } = await supabase.rpc("get_guest_reaction", {
-    p_post_id: postId,
-    p_guest_id: guestId,
-  });
-  if (error) return null;
-  const rows = (data ?? []) as Record<string, unknown>[];
-  if (rows.length === 0) return null;
-  return String(rows[0].reaction_type) as ReactionType;
+  const { data, error } = await supabase
+    .from("reactions")
+    .select("reaction_type")
+    .eq("post_id", postId)
+    .eq("guest_id", guestId)
+    .is("user_id", null)
+    .maybeSingle();
+  if (error) {
+    console.log("[getGuestReaction] error", postId, error.message);
+    return null;
+  }
+  if (!data) return null;
+  return String((data as Record<string, unknown>).reaction_type) as ReactionType;
 }
 
 /** Fetch guest reactions for multiple posts at once — mirrors getMyReactions for logged-in users. */

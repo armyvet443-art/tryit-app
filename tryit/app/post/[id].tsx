@@ -30,12 +30,12 @@ import {
   addComment,
   addReply,
   deleteComment,
-  deleteReaction,
   fetchPost,
   getComments,
   getFollowingIds,
   getGuestReaction,
   getMyReactions,
+  getReactionCounts,
   getSavedSet,
   getTriedSet,
   setSaved,
@@ -45,6 +45,15 @@ import {
 import type { CommentItem, ReactionType, TryPost } from "@/types/models";
 import { REACTION_META } from "@/types/models";
 import { formatCount, parseMediaItems, timeAgo } from "@/utils/format";
+
+type ReactionCounts = Record<ReactionType, number>;
+
+const EMPTY_COUNTS: ReactionCounts = {
+  must_try: 0,
+  worth_it: 0,
+  maybe: 0,
+  not_for_me: 0,
+};
 
 const REACTION_ORDER: ReactionType[] = ["must_try", "worth_it", "maybe", "not_for_me"];
 
@@ -60,12 +69,7 @@ export default function PostDetailScreen() {
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [sending, setSending] = useState<boolean>(false);
   const [reaction, setReaction] = useState<ReactionType | null>(null);
-  const [counts, setCounts] = useState<Record<ReactionType, number>>({
-    must_try: 0,
-    worth_it: 0,
-    maybe: 0,
-    not_for_me: 0,
-  });
+  const [counts, setCounts] = useState<ReactionCounts>(EMPTY_COUNTS);
   const [isTried, setIsTried] = useState<boolean>(false);
   const [triedCount, setTriedCount] = useState<number>(0);
   const [isSaved, setIsSaved] = useState<boolean>(false);
@@ -79,6 +83,14 @@ export default function PostDetailScreen() {
   const commentsQuery = useQuery<CommentItem[]>({
     queryKey: ["comments", postId],
     queryFn: () => getComments(postId),
+    enabled: postId.length > 0,
+  });
+
+  // Reaction counts read straight from the reactions table — no RPC, no posts
+  // counter columns. invalidated locally after each vote.
+  const countsQuery = useQuery<ReactionCounts>({
+    queryKey: ["reactionCounts", postId],
+    queryFn: () => getReactionCounts(postId),
     enabled: postId.length > 0,
   });
 
@@ -156,14 +168,12 @@ export default function PostDetailScreen() {
   }, [savedQuery.data]);
 
   useEffect(() => {
+    if (countsQuery.data) setCounts(countsQuery.data);
+  }, [countsQuery.data]);
+
+  useEffect(() => {
     if (postQuery.data) {
       setTriedCount(postQuery.data.tried_count);
-      setCounts({
-        must_try: postQuery.data.must_try_count,
-        worth_it: postQuery.data.worth_it_count,
-        maybe: postQuery.data.maybe_count,
-        not_for_me: postQuery.data.not_for_me_count,
-      });
     }
   }, [postQuery.data]);
 
@@ -176,41 +186,22 @@ export default function PostDetailScreen() {
     async (type: ReactionType) => {
       if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const previous = reaction;
+      const nextReaction = previous === type ? null : type;
       const nextCounts = { ...counts };
-      if (previous === type) {
-        setReaction(null);
-        nextCounts[type] = Math.max(0, nextCounts[type] - 1);
-        setCounts(nextCounts);
-        try {
-          await deleteReaction(postId, userId, guestId);
-          queryClient.invalidateQueries({ queryKey: ["myReaction", userId, postId] });
-          queryClient.invalidateQueries({ queryKey: ["post", postId] });
-          queryClient.invalidateQueries({ queryKey: ["myReactions"] });
-          queryClient.invalidateQueries({ queryKey: ["feed"] });
-        } catch (e) {
-          console.log("[reaction] delete failed", e);
-          setReaction(previous);
-          setCounts(counts);
-        }
-        return;
-      }
-      setReaction(type);
       if (previous) nextCounts[previous] = Math.max(0, nextCounts[previous] - 1);
-      nextCounts[type] = nextCounts[type] + 1;
+      if (nextReaction) nextCounts[nextReaction] = nextCounts[nextReaction] + 1;
+      setReaction(nextReaction);
       setCounts(nextCounts);
       try {
-        await upsertReaction(postId, type, userId, guestId);
-        queryClient.invalidateQueries({ queryKey: ["myReaction", userId, postId] });
-        queryClient.invalidateQueries({ queryKey: ["post", postId] });
-        queryClient.invalidateQueries({ queryKey: ["myReactions"] });
-        queryClient.invalidateQueries({ queryKey: ["feed"] });
+        const freshCounts = await upsertReaction(postId, nextReaction, userId, guestId);
+        setCounts(freshCounts);
       } catch (e) {
         console.log("[reaction] upsert failed", e);
         setReaction(previous);
         setCounts(counts);
       }
     },
-    [reaction, counts, postId, userId, guestId, queryClient],
+    [reaction, counts, postId, userId, guestId],
   );
 
   const handleTried = useCallback(async () => {

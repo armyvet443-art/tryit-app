@@ -23,10 +23,13 @@ import {
   getFollowingIds,
   getGuestReactions,
   getMyReactions,
+  getReactionCountsBatch,
   getSavedSet,
   getTriedSet,
 } from "@/services/tryit-service";
 import type { ReactionType, TryPost } from "@/types/models";
+
+type ReactionCounts = Record<ReactionType, number>;
 
 const PAGE_SIZE = 20;
 
@@ -62,6 +65,14 @@ export default function FeedScreen() {
     enabled: postIds.length > 0 && (userId !== null || guestId.length > 0),
   });
 
+  // Reaction counts read straight from the reactions table (batch) — no RPC,
+  // no posts counter columns. This is what fills the Try Meter numbers.
+  const countsQuery = useQuery<Record<string, ReactionCounts>>({
+    queryKey: ["reactionCounts", postIdsKey],
+    queryFn: () => getReactionCountsBatch(postIds),
+    enabled: postIds.length > 0,
+  });
+
   const triedQuery = useQuery<Set<string>>({
     queryKey: ["triedSet", userId, postIdsKey],
     queryFn: () => getTriedSet(postIds, userId as string),
@@ -82,8 +93,9 @@ export default function FeedScreen() {
 
   const onRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["feed", feedType, userId] });
-    // Also refresh reaction/tried/saved state so votes persist after pull-to-refresh
+    // Also refresh reaction/tried/saved/counts state so votes persist after pull-to-refresh
     queryClient.invalidateQueries({ queryKey: ["myReactions"] });
+    queryClient.invalidateQueries({ queryKey: ["reactionCounts"] });
     queryClient.invalidateQueries({ queryKey: ["triedSet"] });
     queryClient.invalidateQueries({ queryKey: ["savedSet"] });
   }, [queryClient, feedType, userId]);
@@ -93,12 +105,13 @@ export default function FeedScreen() {
       <PostCard
         post={item}
         myReaction={reactionsQuery.data?.[item.id] ?? null}
+        reactionCounts={countsQuery.data?.[item.id] ?? null}
         tried={triedQuery.data?.has(item.id) ?? false}
         saved={savedQuery.data?.has(item.id) ?? false}
         isFollowingAuthor={followingQuery.data?.has(item.user_id) ?? false}
       />
     ),
-    [reactionsQuery.data, triedQuery.data, savedQuery.data, followingQuery.data],
+    [reactionsQuery.data, countsQuery.data, triedQuery.data, savedQuery.data, followingQuery.data],
   );
 
   return (
