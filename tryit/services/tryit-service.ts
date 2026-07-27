@@ -685,7 +685,7 @@ export async function uploadPostVideo(uri: string, extension: string, userId: st
   console.log("[uploadPostVideo] blob size", blob.size, "type", blob.type);
   const { error } = await supabase.storage
     .from("post-media")
-    .upload(path, blob, { contentType, upsert: true });
+    .upload(path, blob, { contentType, upsert: false });
   if (error) {
     console.log("[uploadPostVideo] upload error", error.message);
     throw error;

@@ -76,8 +76,12 @@ export default function CreateScreen() {
             );
             return;
           }
-          if (sizeBytes > SOFT_LIMIT_BYTES) {
-            console.log("[pickImage] video over soft limit but under hard cap, continuing");
+          if (sizeBytes > SOFT_LIMIT_BYTES && sizeBytes <= MAX_VIDEO_BYTES) {
+            Alert.alert(
+              "Large video",
+              `This clip is ${(sizeBytes / 1024 / 1024).toFixed(1)}MB. It may upload slowly or fail if the storage bucket cap is lower. For best results, trim it shorter in your Photos app first.`,
+              [{ text: "Use it anyway", style: "default" }, { text: "Pick another", style: "cancel" }],
+            );
           }
         } catch (e) {
           console.log("[pickImage] could not read file size, continuing", e);
