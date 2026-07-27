@@ -87,19 +87,24 @@ async function attachAuthors(rows: Record<string, unknown>[]): Promise<TryPost[]
 }
 
 export async function fetchLatestPosts(offset: number, limit: number): Promise<TryPost[]> {
-  const { data, error } = await supabase
-    .from("posts")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
-  if (error) throw error;
-  return attachAuthors((data ?? []) as Record<string, unknown>[]);
+  try {
+    const { data, error } = await supabase
+      .from("posts")
+      .select("*")
+ .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (error) throw error;
+    return await attachAuthors((data ?? []) as Record<string, unknown>[]);
+  } catch (e) {
+    console.log("[fetchLatestPosts] failed, returning []", e);
+    return [];
+  }
 }
 
 export async function fetchFeed(
   feedType: FeedType,
   userId: string | null,
-  offset: number,
+ offset: number,
   limit: number,
 ): Promise<TryPost[]> {
   try {
@@ -111,7 +116,7 @@ export async function fetchFeed(
         p_feed_type: "for_you",
       });
       if (error) throw error;
-      return attachAuthors((data ?? []) as Record<string, unknown>[]);
+      return await attachAuthors((data ?? []) as Record<string, unknown>[]);
     }
     if (feedType === "following" && userId) {
       const { data, error } = await supabase.rpc("get_strict_following_feed", {
@@ -120,7 +125,7 @@ export async function fetchFeed(
         p_limit: limit,
       });
       if (error) throw error;
-      return attachAuthors((data ?? []) as Record<string, unknown>[]);
+      return await attachAuthors((data ?? []) as Record<string, unknown>[]);
     }
     if (feedType === "trending") {
       const { data, error } = await supabase.rpc("get_trending_posts", {
@@ -129,14 +134,15 @@ export async function fetchFeed(
         p_category: null,
       });
       if (error) throw error;
-      return attachAuthors((data ?? []) as Record<string, unknown>[]);
+      return await attachAuthors((data ?? []) as Record<string, unknown>[]);
     }
     if (feedType === "following" && !userId) return [];
-    return fetchLatestPosts(offset, limit);
+    return await fetchLatestPosts(offset, limit);
   } catch (e) {
     console.log("[feed] RPC failed, falling back to latest", e);
     if (feedType === "following") return [];
-    return fetchLatestPosts(offset, limit);
+    // Fallback must not throw — fetchLatestPosts already swallows network errors.
+    return await fetchLatestPosts(offset, limit);
   }
 }
 
