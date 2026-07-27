@@ -15,23 +15,38 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const migratedRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // Wrap getSession defensively — a network failure ("Load failed") must never
+    // crash the app. The login screen works offline; we just show no session.
     supabase.auth
       .getSession()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) console.log("[auth] getSession error:", error.message);
         setSession(data.session);
       })
-      .catch((e) => console.log("[auth] getSession failed", e))
+      .catch((e: unknown) => console.log("[auth] getSession failed:", e instanceof Error ? e.message : e))
       .finally(() => setInitializing(false));
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
+    let sub: { subscription?: { unsubscribe: () => void } } | undefined;
+    try {
+      const result = supabase.auth.onAuthStateChange((_event, newSession) => {
+        setSession(newSession);
+      });
+      sub = result.data;
+    } catch (e) {
+      console.log("[auth] onAuthStateChange setup failed:", e instanceof Error ? e.message : e);
+    }
 
     getOrCreateGuestId()
       .then(setGuestId)
-      .catch((e) => console.log("[auth] guest id failed", e));
+      .catch((e: unknown) => console.log("[auth] guest id failed:", e instanceof Error ? e.message : e));
 
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      try {
+        sub?.subscription?.unsubscribe();
+      } catch {
+        /* ignore */
+      }
+    };
   }, []);
 
   const userId = session?.user?.id ?? null;

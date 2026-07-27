@@ -14,10 +14,13 @@ const SUPABASE_ANON_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
   "sb_publishable_Msp-8Geaixn3qs-Vq8d8Yw_52KOfnpg";
 
+console.log("[supabase] URL:", SUPABASE_URL);
+console.log("[supabase] key exists:", Boolean(SUPABASE_ANON_KEY));
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: AsyncStorage,
-    autoRefreshToken: true,
+    autoRefreshToken: false,
     persistSession: true,
     detectSessionInUrl: false,
   },
