@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
+import * as FileSystem from "expo-file-system";
 import { useRouter } from "expo-router";
 import { Camera, ImagePlus, Video as VideoIcon } from "lucide-react-native";
 import React, { useState } from "react";
@@ -39,14 +40,18 @@ export default function CreateScreen() {
   const [isVideo, setIsVideo] = useState<boolean>(false);
   const [posting, setPosting] = useState<boolean>(false);
 
+  const MAX_VIDEO_BYTES = 100 * 1024 * 1024; // 100MB hard cap (matches bucket limit)
+  const SOFT_LIMIT_BYTES = 50 * 1024 * 1024; // warn above this
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images", "videos"],
-      quality: 0.8,
+      quality: 0.7,
       base64: true,
       allowsEditing: true,
       aspect: [4, 3],
-      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Low,
+      videoExportPreset: ImagePicker.VideoExportPreset.LowQuality,
     });
     console.log("[pickImage] result:", { canceled: result.canceled, assets: result.assets?.map(a => ({ uri: a.uri, type: a.type, mimeType: a.mimeType })) });
     if (!result.canceled && result.assets.length > 0) {
@@ -56,6 +61,29 @@ export default function CreateScreen() {
         asset.mimeType?.startsWith("video/") === true ||
         /\.(mp4|mov|webm)$/i.test(asset.uri);
       console.log("[pickImage] asset picked:", { uri: asset.uri, isVideo: assetIsVideo, mimeType: asset.mimeType, type: asset.type });
+
+      if (assetIsVideo) {
+        // Enforce the bucket size limit BEFORE upload so we can give a clear
+        // message instead of a generic "exceeded maximum size" from storage.
+        try {
+          const info = await FileSystem.getInfoAsync(asset.uri);
+          const sizeBytes = info.exists && !info.isDirectory ? info.size : 0;
+          console.log("[pickImage] video size bytes:", sizeBytes);
+          if (sizeBytes > MAX_VIDEO_BYTES) {
+            Alert.alert(
+              "Video too large",
+              `That video is ${(sizeBytes / 1024 / 1024).toFixed(1)}MB. The max is 100MB — pick a shorter clip or trim it down.`,
+            );
+            return;
+          }
+          if (sizeBytes > SOFT_LIMIT_BYTES) {
+            console.log("[pickImage] video over soft limit but under hard cap, continuing");
+          }
+        } catch (e) {
+          console.log("[pickImage] could not read file size, continuing", e);
+        }
+      }
+
       setIsVideo(assetIsVideo);
       setImageUri(asset.uri);
       if (assetIsVideo) {
