@@ -162,15 +162,18 @@ export async function upsertReaction(
   userId: string | null,
   guestId: string,
 ): Promise<void> {
+  // p_guest_id is always TEXT (e.g. "guest_xxx" or UUID string). Pass null for
+  // logged-in users so the RPC's (user_id = p_user_id OR guest_id = p_guest_id)
+  // clause only matches the user's row.
   const params = {
     p_post_id: postId,
-    p_reaction: reaction,
+    p_reaction_type: reaction,
     p_user_id: userId,
     p_guest_id: userId ? null : guestId,
   };
   console.log("[upsertReaction] calling RPC with:", {
     p_post_id: params.p_post_id,
-    p_reaction: params.p_reaction,
+    p_reaction_type: params.p_reaction_type,
     p_user_id: params.p_user_id,
     p_guest_id: params.p_guest_id,
   });

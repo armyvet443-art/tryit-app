@@ -81,6 +81,7 @@ export default function PostCard({
           queryClient.invalidateQueries({ queryKey: ["myReactions"] });
           queryClient.invalidateQueries({ queryKey: ["myReaction", userId, post.id] });
           queryClient.invalidateQueries({ queryKey: ["post", post.id] });
+          queryClient.invalidateQueries({ queryKey: ["feed"] });
         } catch (e) {
           console.log("[reaction] delete failed", e);
           setReaction(previous);
@@ -97,6 +98,7 @@ export default function PostCard({
         queryClient.invalidateQueries({ queryKey: ["myReactions"] });
         queryClient.invalidateQueries({ queryKey: ["myReaction", userId, post.id] });
         queryClient.invalidateQueries({ queryKey: ["post", post.id] });
+        queryClient.invalidateQueries({ queryKey: ["feed"] });
       } catch (e) {
         console.log("[reaction] upsert failed", e);
         setReaction(previous);
