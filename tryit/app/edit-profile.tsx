@@ -20,7 +20,7 @@ import {
 import Avatar from "@/components/Avatar";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
-import { updateProfile, uploadAvatar, uploadCover } from "@/services/tryit-service";
+import { checkUsernameAvailable, updateProfile, uploadAvatar, uploadCover } from "@/services/tryit-service";
 
 export default function EditProfileScreen() {
   const { userId, profile, guestId, refreshProfile } = useAuth();
@@ -83,6 +83,19 @@ export default function EditProfileScreen() {
       Alert.alert("Missing info", "Display name and username are required.");
       return;
     }
+    if (bio.length > 150) {
+      Alert.alert("Bio too long", "Bio must be 150 characters or less.");
+      return;
+    }
+    const cleanUsername = username.trim().toLowerCase().replace(/\s+/g, "");
+    // Check username uniqueness if changed
+    if (cleanUsername !== profile?.username) {
+      const available = await checkUsernameAvailable(cleanUsername, userId);
+      if (!available) {
+        Alert.alert("Username taken", "That username is already in use. Try another one.");
+        return;
+      }
+    }
     setSaving(true);
     try {
       let avatarUrl = profile?.avatar_url ?? "";
@@ -97,7 +110,7 @@ export default function EditProfileScreen() {
       }
       await updateProfile(userId, {
         display_name: displayName.trim(),
-        username: username.trim().toLowerCase().replace(/\s+/g, ""),
+        username: cleanUsername,
         bio: bio.trim(),
         avatar_url: avatarUrl,
         cover_url: coverUrl,
@@ -168,7 +181,7 @@ export default function EditProfileScreen() {
           testID="edit-username"
         />
 
-        <Text style={styles.label}>Bio</Text>
+        <Text style={styles.label}>Bio {bio.length > 0 ? `(${bio.length}/150)` : ""}</Text>
         <TextInput
           style={[styles.input, styles.multiline]}
           value={bio}
@@ -176,7 +189,7 @@ export default function EditProfileScreen() {
           placeholder="Tell people what you like to try..."
           placeholderTextColor={Colors.inactiveIcon}
           multiline
-          maxLength={300}
+          maxLength={150}
           testID="edit-bio"
         />
 

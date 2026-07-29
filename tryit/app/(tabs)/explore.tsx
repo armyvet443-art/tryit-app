@@ -227,7 +227,7 @@ export default function ExploreScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderUserRow}
           contentContainerStyle={styles.listContent}
-          ListEmptyComponent={<EmptyState emoji="🔍" title="No people found" />}
+          ListEmptyComponent={<EmptyState emoji="🔍" title="No people found" subtitle={`No results for '${trimmed}' — try another name.`} />}
         />
       ) : (
         <FlatList
@@ -237,7 +237,7 @@ export default function ExploreScreen() {
           numColumns={2}
           columnWrapperStyle={styles.gridRow}
           contentContainerStyle={styles.listContent}
-          ListEmptyComponent={<EmptyState emoji="🔍" title="Nothing here yet" />}
+          ListEmptyComponent={<EmptyState emoji="🔍" title="Nothing here yet" subtitle={`No results for '${trimmed}' — try another category or search term.`} />}
         />
       )}
     </View>

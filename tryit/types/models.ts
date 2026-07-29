@@ -65,11 +65,13 @@ export interface NotificationItem {
   id: string;
   user_id: string;
   actor_id: string | null;
+  actor_guest_id: string | null;
   post_id: string | null;
   notification_type: string;
   message: string;
   is_read: boolean;
   created_at: string;
+  actor: AuthorProfile | null;
 }
 
 export interface ConversationItem {

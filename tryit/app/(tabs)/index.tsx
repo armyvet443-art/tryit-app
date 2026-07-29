@@ -36,6 +36,28 @@ import type { ReactionType, TryPost } from "@/types/models";
 
 type ReactionCounts = Record<ReactionType, number>;
 
+/** Pulsing skeleton placeholder card shown while the feed loads. */
+function SkeletonCard() {
+  return (
+    <View style={styles.skeletonCard}>
+      <View style={styles.skeletonHeader}>
+        <View style={styles.skeletonAvatar} />
+        <View style={styles.skeletonLines}>
+          <View style={[styles.skeletonLine, { width: 120 }]} />
+          <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+        </View>
+      </View>
+      <View style={styles.skeletonMedia} />
+      <View style={styles.skeletonFooter}>
+        <View style={styles.skeletonPill} />
+        <View style={styles.skeletonPill} />
+        <View style={styles.skeletonPill} />
+        <View style={styles.skeletonPill} />
+      </View>
+    </View>
+  );
+}
+
 const PAGE_SIZE = 20;
 
 const FEED_TABS: { key: FeedType; label: string; emoji: string }[] = [
@@ -231,8 +253,19 @@ export default function FeedScreen() {
       </View>
 
       {feedQuery.isLoading ? (
+        <FlatList
+          data={["skeleton-1", "skeleton-2", "skeleton-3"]}
+          keyExtractor={(item) => item}
+          renderItem={() => <SkeletonCard />}
+          contentContainerStyle={styles.listContent}
+          scrollEnabled={false}
+        />
+      ) : feedQuery.isError ? (
         <View style={styles.loading}>
-          <ActivityIndicator size="large" color={Colors.flameOrange} />
+          <Text style={styles.errorText}>Couldn't load feed</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => feedQuery.refetch()} testID="feed-retry">
+            <Text style={styles.retryText}>Tap to retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -253,6 +286,8 @@ export default function FeedScreen() {
                 emoji="👥"
                 title="Log in to see your Following feed"
                 subtitle="Follow creators and their Tries will show up here."
+                actionLabel="Log In"
+                onAction={() => router.push("/auth/login")}
               />
             ) : feedType === "following" ? (
               <EmptyState
@@ -263,8 +298,10 @@ export default function FeedScreen() {
             ) : (
               <EmptyState
                 emoji="🔥"
-                title="No Tries yet"
-                subtitle="Be the first to share something you tried!"
+                title="No Tries yet — be first!"
+                subtitle="Share something you tried and get the community voting."
+                actionLabel="Post a Try"
+                onAction={() => router.push("/(tabs)/create")}
               />
             )
           }
@@ -330,6 +367,77 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    gap: 12,
+  },
+  errorText: {
+    color: Colors.mutedText,
+    fontSize: 16,
+    fontWeight: "600" as const,
+  },
+  retryButton: {
+    backgroundColor: Colors.surfaceVariant,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Colors.flameOrange,
+  },
+  retryText: {
+    color: Colors.flameOrange,
+    fontSize: 14,
+    fontWeight: "700" as const,
+  },
+  skeletonCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    marginHorizontal: 12,
+    marginBottom: 14,
+    paddingBottom: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden",
+  },
+  skeletonHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  skeletonAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surfaceVariant,
+  },
+  skeletonLines: {
+    flex: 1,
+    gap: 6,
+  },
+  skeletonLine: {
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.surfaceVariant,
+  },
+  skeletonLineShort: {
+    width: 100,
+  },
+  skeletonMedia: {
+    width: "100%",
+    height: 340,
+    backgroundColor: Colors.surfaceVariant,
+  },
+  skeletonFooter: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+  },
+  skeletonPill: {
+    flex: 1,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.surfaceVariant,
   },
   listContent: {
     paddingBottom: 24,

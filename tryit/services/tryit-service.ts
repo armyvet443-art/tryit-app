@@ -413,6 +413,42 @@ export async function toggleFire(
       console.log("[toggleFire] insert error", postId, error.message);
       throw error;
     }
+    // Best-effort: notify the post owner about the fire
+    try {
+      const { data: post } = await supabase
+        .from("posts")
+        .select("user_id, title")
+        .eq("id", postId)
+        .maybeSingle();
+      if (post && post.user_id) {
+        const postOwnerId = String(post.user_id);
+        let actorName = "Someone";
+        if (userId) {
+          const { data: profile } = await supabase
+            .from("user_profiles")
+            .select("display_name, username")
+            .eq("id", userId)
+            .maybeSingle();
+          if (profile) {
+            actorName = String(profile.display_name || profile.username || "Someone");
+          }
+        } else {
+          actorName = "A guest";
+        }
+        const postTitle = String(post.title ?? "your post");
+        const snippet = postTitle.length > 30 ? postTitle.slice(0, 30) + "..." : postTitle;
+        await createNotification({
+          recipientId: postOwnerId,
+          actorId: userId,
+          actorGuestId: userId ? null : guestId,
+          postId,
+          type: "fire",
+          message: `${actorName} fired your "${snippet}"`,
+        });
+      }
+    } catch (e) {
+      console.log("[toggleFire] notification failed", e);
+    }
   }
 
   // Return fresh count
@@ -534,6 +570,35 @@ export async function setTried(postId: string, userId: string, tried: boolean): 
       .from("tried_this")
       .upsert({ post_id: postId, user_id: userId }, { onConflict: "post_id,user_id" });
     if (error) throw error;
+    // Best-effort: notify the post owner
+    try {
+      const { data: post } = await supabase
+        .from("posts")
+        .select("user_id, title")
+        .eq("id", postId)
+        .maybeSingle();
+      if (post && post.user_id) {
+        const postOwnerId = String(post.user_id);
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("display_name, username")
+          .eq("id", userId)
+          .maybeSingle();
+        const actorName = profile ? String(profile.display_name || profile.username || "Someone") : "Someone";
+        const postTitle = String(post.title ?? "your post");
+        const snippet = postTitle.length > 30 ? postTitle.slice(0, 30) + "..." : postTitle;
+        await createNotification({
+          recipientId: postOwnerId,
+          actorId: userId,
+          actorGuestId: null,
+          postId,
+          type: "tried",
+          message: `${actorName} tried "${snippet}"`,
+        });
+      }
+    } catch (e) {
+      console.log("[setTried] notification failed", e);
+    }
   } else {
     const { error } = await supabase.from("tried_this").delete().eq("post_id", postId).eq("user_id", userId);
     if (error) throw error;
@@ -602,7 +667,8 @@ export async function getComments(postId: string): Promise<CommentItem[]> {
   });
 }
 
-/** Add a comment. Authenticated users pass userId; guests pass guestId. */
+/** Add a comment. Authenticated users pass userId; guests pass guestId.
+ *  Also creates a notification for the post owner (best-effort). */
 export async function addComment(
   postId: string,
   content: string,
@@ -627,6 +693,43 @@ export async function addComment(
   if (error) {
     console.log("[addComment] insert error", postId, error.message);
     throw error;
+  }
+  // Best-effort: notify the post owner about the comment
+  try {
+    const { data: post } = await supabase
+      .from("posts")
+      .select("user_id, title")
+      .eq("id", postId)
+      .maybeSingle();
+    if (post && post.user_id) {
+      const postOwnerId = String(post.user_id);
+      // Fetch commenter's display name for the notification message
+      let commenterName = "Someone";
+      if (userId) {
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("display_name, username")
+          .eq("id", userId)
+          .maybeSingle();
+        if (profile) {
+          commenterName = String(profile.display_name || profile.username || "Someone");
+        }
+      } else {
+        commenterName = "A guest";
+      }
+      const postTitle = String(post.title ?? "your post");
+      const snippet = postTitle.length > 30 ? postTitle.slice(0, 30) + "..." : postTitle;
+      await createNotification({
+        recipientId: postOwnerId,
+        actorId: userId,
+        actorGuestId: userId ? null : guestId,
+        postId,
+        type: "comment",
+        message: `${commenterName} commented on "${snippet}"`,
+      });
+    }
+  } catch (e) {
+    console.log("[addComment] notification failed", e);
   }
 }
 
@@ -694,6 +797,24 @@ export async function setFollowing(userId: string, targetId: string, follow: boo
       .from("follows")
       .upsert({ follower_id: userId, following_id: targetId }, { onConflict: "follower_id,following_id" });
     if (error) throw error;
+    // Best-effort: notify the followed user
+    try {
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("display_name, username")
+        .eq("id", userId)
+        .maybeSingle();
+      const actorName = profile ? String(profile.display_name || profile.username || "Someone") : "Someone";
+      await createNotification({
+        recipientId: targetId,
+        actorId: userId,
+        actorGuestId: null,
+        type: "follow",
+        message: `${actorName} started following you`,
+      });
+    } catch (e) {
+      console.log("[setFollowing] notification failed", e);
+    }
   } else {
     const { error } = await supabase
       .from("follows")
@@ -729,6 +850,23 @@ export async function getProfile(userId: string): Promise<UserProfile | null> {
     longest_streak: num(r.longest_streak),
     created_at: String(r.created_at ?? ""),
   };
+}
+
+/** Check if a username is already taken by another user. Returns true if available. */
+export async function checkUsernameAvailable(username: string, currentUserId: string): Promise<boolean> {
+  const clean = username.trim().toLowerCase().replace(/\s+/g, "");
+  if (clean.length === 0) return false;
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("id")
+    .eq("username", clean)
+    .neq("id", currentUserId)
+    .maybeSingle();
+  if (error) {
+    console.log("[checkUsernameAvailable] error", error.message);
+    return true; // Allow on error — don't block profile save
+  }
+  return !data;
 }
 
 export async function updateProfile(
@@ -852,16 +990,35 @@ export async function getNotifications(userId: string): Promise<NotificationItem
     .order("created_at", { ascending: false })
     .limit(60);
   if (error) throw error;
-  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-    id: String(r.id),
-    user_id: String(r.user_id),
-    actor_id: r.actor_id ? String(r.actor_id) : null,
-    post_id: r.post_id ? String(r.post_id) : null,
-    notification_type: String(r.notification_type ?? "unknown"),
-    message: String(r.message ?? ""),
-    is_read: Boolean(r.is_read),
-    created_at: String(r.created_at ?? ""),
-  }));
+  const rows = (data ?? []) as Record<string, unknown>[];
+  if (rows.length === 0) return [];
+  // Fetch actor profiles for notifications that have an actor_id
+  const actorIds = Array.from(new Set(
+    rows.filter((r) => r.actor_id).map((r) => String(r.actor_id)),
+  ));
+  let actorMap = new Map<string, Record<string, unknown>>();
+  if (actorIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("user_profiles")
+      .select("id, username, display_name, avatar_url, is_verified")
+      .in("id", actorIds);
+    (profiles ?? []).forEach((p: Record<string, unknown>) => actorMap.set(String(p.id), p));
+  }
+  return rows.map((r) => {
+    const aid = r.actor_id ? String(r.actor_id) : null;
+    return {
+      id: String(r.id),
+      user_id: String(r.user_id),
+      actor_id: aid,
+      actor_guest_id: r.actor_guest_id ? String(r.actor_guest_id) : null,
+      post_id: r.post_id ? String(r.post_id) : null,
+      notification_type: String(r.notification_type ?? "unknown"),
+      message: String(r.message ?? ""),
+      is_read: Boolean(r.is_read),
+      created_at: String(r.created_at ?? ""),
+      actor: aid ? mapAuthor(actorMap.get(aid)) : null,
+    };
+  });
 }
 
 export async function markAllNotificationsRead(userId: string): Promise<void> {
@@ -871,6 +1028,42 @@ export async function markAllNotificationsRead(userId: string): Promise<void> {
     .eq("user_id", userId)
     .eq("is_read", false);
   if (error) throw error;
+}
+
+/** Delete a single notification (recipient only — RLS enforces). */
+export async function deleteNotification(notificationId: string): Promise<void> {
+  const { error } = await supabase.from("notifications").delete().eq("id", notificationId);
+  if (error) {
+    console.log("[deleteNotification] error", notificationId, error.message);
+    throw error;
+  }
+}
+
+/** Create a notification. Skips if actor === recipient (don't notify yourself). */
+export async function createNotification(input: {
+  recipientId: string;
+  actorId: string | null;
+  actorGuestId: string | null;
+  postId?: string | null;
+  type: string;
+  message: string;
+}): Promise<void> {
+  // Don't create notifications for your own actions
+  if (input.actorId && input.actorId === input.recipientId) return;
+  const row: Record<string, unknown> = {
+    user_id: input.recipientId,
+    notification_type: input.type,
+    message: input.message,
+  };
+  if (input.actorId) {
+    row.actor_id = input.actorId;
+  }
+  if (input.postId) row.post_id = input.postId;
+  const { error } = await supabase.from("notifications").insert(row);
+  if (error) {
+    console.log("[createNotification] error", error.message);
+    // Best-effort — don't throw, notifications are non-critical
+  }
 }
 
 export async function getUnreadNotificationCount(userId: string): Promise<number> {

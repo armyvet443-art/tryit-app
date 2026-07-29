@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { Bell } from "lucide-react-native";
+import { Bell, Trash2 } from "lucide-react-native";
 import React, { useCallback, useEffect } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -13,10 +14,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import Avatar from "@/components/Avatar";
 import EmptyState from "@/components/EmptyState";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
-import { getNotifications, markAllNotificationsRead } from "@/services/tryit-service";
+import { deleteNotification, getNotifications, markAllNotificationsRead } from "@/services/tryit-service";
 import type { NotificationItem } from "@/types/models";
 import { timeAgo } from "@/utils/format";
 
@@ -26,16 +28,12 @@ function iconFor(type: string): string {
       return "👥";
     case "comment":
       return "💬";
-    case "reaction":
+    case "fire":
       return "🔥";
     case "tried":
       return "✅";
-    case "message":
-      return "✉️";
-    case "streak_reminder":
-      return "⚡";
-    case "trending_post":
-      return "📈";
+    case "reaction":
+      return "🔥";
     default:
       return "🔔";
   }
@@ -61,6 +59,22 @@ export default function AlertsScreen() {
     }
   }, [userId, notificationsQuery.data, queryClient]);
 
+  const handleDeleteNotification = useCallback(
+    (notificationId: string) => {
+      // Optimistic: remove from local cache
+      queryClient.setQueriesData<NotificationItem[]>(
+        { queryKey: ["notifications", userId] },
+        (old) => (old ? old.filter((n) => n.id !== notificationId) : old),
+      );
+      deleteNotification(notificationId).catch((e) => {
+        console.log("[alerts] delete failed", e);
+        // Revert on failure
+        queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
+      });
+    },
+    [queryClient, userId],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: NotificationItem }) => (
       <TouchableOpacity
@@ -72,16 +86,36 @@ export default function AlertsScreen() {
             router.push({ pathname: "/user/[id]", params: { id: item.actor_id } });
           }
         }}
+        onLongPress={() => {
+          Alert.alert("Delete notification?", "", [
+            { text: "Cancel", style: "cancel" },
+            { text: "Delete", style: "destructive", onPress: () => handleDeleteNotification(item.id) },
+          ]);
+        }}
       >
-        <Text style={styles.icon}>{iconFor(item.notification_type)}</Text>
+        {item.actor ? (
+          <Avatar uri={item.actor.avatar_url} name={item.actor.display_name} size={40} />
+        ) : (
+          <View style={styles.iconWrap}>
+            <Text style={styles.icon}>{iconFor(item.notification_type)}</Text>
+          </View>
+        )}
         <View style={styles.body}>
           <Text style={styles.message}>{item.message}</Text>
           <Text style={styles.time}>{timeAgo(item.created_at)}</Text>
         </View>
-        {!item.is_read ? <View style={styles.dot} /> : null}
+        {!item.is_read ? <View style={styles.dot} /> : (
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={() => handleDeleteNotification(item.id)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Trash2 size={16} color={Colors.inactiveIcon} />
+          </TouchableOpacity>
+        )}
       </TouchableOpacity>
     ),
-    [router],
+    [router, handleDeleteNotification],
   );
 
   if (!userId) {
@@ -162,6 +196,17 @@ const styles = StyleSheet.create({
   },
   icon: {
     fontSize: 22,
+  },
+  iconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surfaceVariant,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteBtn: {
+    padding: 6,
   },
   body: {
     flex: 1,

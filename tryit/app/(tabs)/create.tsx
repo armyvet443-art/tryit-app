@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import * as FileSystem from "expo-file-system";
 import { useRouter } from "expo-router";
 import { Camera, ImagePlus, Video as VideoIcon } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -39,6 +39,8 @@ export default function CreateScreen() {
   const [imageExt, setImageExt] = useState<string>("jpg");
   const [isVideo, setIsVideo] = useState<boolean>(false);
   const [posting, setPosting] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [mediaLoadFailed, setMediaLoadFailed] = useState<boolean>(false);
   const [showCustomInput, setShowCustomInput] = useState<boolean>(false);
   const [customCategory, setCustomCategory] = useState<string>("");
 
@@ -90,6 +92,7 @@ export default function CreateScreen() {
         }
       }
 
+      setMediaLoadFailed(false);
       setIsVideo(assetIsVideo);
       setImageUri(asset.uri);
       if (assetIsVideo) {
@@ -106,6 +109,8 @@ export default function CreateScreen() {
   };
 
   const handlePost = async () => {
+    // Prevent double-tap
+    if (posting) return;
     if (!userId) {
       router.push("/auth/login");
       return;
@@ -119,16 +124,22 @@ export default function CreateScreen() {
       return;
     }
     setPosting(true);
+    setUploadProgress(0);
     try {
       let mediaUrl = "";
       let mediaType: "image" | "video" = "image";
       if (isVideo && imageUri) {
+        setUploadProgress(10);
         mediaUrl = await uploadPostVideo(imageUri, imageExt, userId);
+        setUploadProgress(80);
         mediaType = "video";
       } else if (imageBase64) {
+        setUploadProgress(10);
         mediaUrl = await uploadPostMedia(imageBase64, imageExt, userId);
+        setUploadProgress(80);
         mediaType = "image";
       }
+      setUploadProgress(90);
       console.log("[handlePost] creating post:", { mediaUrl, mediaType });
       await createPost({
         userId,
@@ -139,6 +150,8 @@ export default function CreateScreen() {
         category,
         location: location.trim(),
       });
+      setUploadProgress(100);
+      // Clear draft on success
       setTitle("");
       setCaption("");
       setCategory("");
@@ -148,13 +161,17 @@ export default function CreateScreen() {
       setIsVideo(false);
       setShowCustomInput(false);
       setCustomCategory("");
+      setUploadProgress(0);
       queryClient.invalidateQueries({ queryKey: ["feed"] });
       queryClient.invalidateQueries({ queryKey: ["userPosts", userId] });
       Alert.alert("Posted! 🔥", "Your Try is live.");
       router.push("/(tabs)");
     } catch (e) {
       const message = e instanceof Error ? e.message : "Something went wrong.";
-      Alert.alert("Could not post", message);
+      // Keep draft for retry — don't clear fields on fail
+      setUploadProgress(0);
+      Alert.alert("Upload failed", "Check your internet and try again. Your draft is saved.");
+      console.log("[handlePost] error", message);
     } finally {
       setPosting(false);
     }
@@ -188,7 +205,19 @@ export default function CreateScreen() {
         <TouchableOpacity style={styles.mediaPicker} onPress={pickImage} testID="pick-image-button">
           {imageUri ? (
             <View style={styles.mediaPreviewWrap}>
-              <Image source={{ uri: imageUri }} style={styles.mediaPreview} contentFit="cover" />
+              <Image
+                source={{ uri: imageUri }}
+                style={styles.mediaPreview}
+                contentFit="cover"
+                onError={() => setMediaLoadFailed(true)}
+                onLoad={() => setMediaLoadFailed(false)}
+              />
+              {mediaLoadFailed ? (
+                <View style={styles.mediaErrorOverlay}>
+                  <Text style={styles.mediaErrorText}>Couldn't load preview</Text>
+                  <Text style={styles.mediaRetryText}>Tap to retry</Text>
+                </View>
+              ) : null}
               {isVideo ? (
                 <View style={styles.videoBadge}>
                   <VideoIcon size={16} color="#FFFFFF" />
@@ -203,6 +232,16 @@ export default function CreateScreen() {
             </View>
           )}
         </TouchableOpacity>
+
+        {/* Upload progress bar */}
+        {posting && uploadProgress > 0 ? (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${uploadProgress}%` }]} />
+            </View>
+            <Text style={styles.progressText}>Uploading... {uploadProgress}%</Text>
+          </View>
+        ) : null}
 
         <Text style={styles.label}>Title</Text>
         <TextInput
@@ -305,7 +344,12 @@ export default function CreateScreen() {
           disabled={posting}
         >
           {posting ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <View style={styles.postingRow}>
+              <ActivityIndicator color="#FFFFFF" size="small" />
+              <Text style={styles.primaryButtonText}>
+                {uploadProgress > 0 ? `Uploading... ${uploadProgress}%` : "Posting..."}
+              </Text>
+            </View>
           ) : (
             <Text style={styles.primaryButtonText}>Post It 🔥</Text>
           )}
@@ -378,6 +422,52 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800" as const,
     letterSpacing: 0.5,
+  },
+  mediaErrorOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(15,15,15,0.7)",
+  },
+  mediaErrorText: {
+    color: Colors.error,
+    fontSize: 14,
+    fontWeight: "700" as const,
+  },
+  mediaRetryText: {
+    color: Colors.mutedText,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  progressContainer: {
+    marginBottom: 12,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: Colors.surfaceVariant,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: Colors.flameOrange,
+    borderRadius: 3,
+  },
+  progressText: {
+    color: Colors.mutedText,
+    fontSize: 12,
+    marginTop: 6,
+    textAlign: "center",
+  },
+  postingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    justifyContent: "center",
   },
   mediaPlaceholder: {
     width: "100%",
