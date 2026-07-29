@@ -114,6 +114,14 @@ export const CATEGORIES: string[] = [
   "Beauty",
   "Games",
   "Music",
+  "Pets",
+  "Cars",
+  "Art",
+  "Business",
+  "Education",
+  "Finance",
+  "Events",
+  "Parenting",
 ];
 
 /** Media item — a post may have multiple media_url values via a media array. */

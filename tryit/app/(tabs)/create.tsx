@@ -39,6 +39,8 @@ export default function CreateScreen() {
   const [imageExt, setImageExt] = useState<string>("jpg");
   const [isVideo, setIsVideo] = useState<boolean>(false);
   const [posting, setPosting] = useState<boolean>(false);
+  const [showCustomInput, setShowCustomInput] = useState<boolean>(false);
+  const [customCategory, setCustomCategory] = useState<string>("");
 
   const MAX_VIDEO_BYTES = 100 * 1024 * 1024; // 100MB hard cap (matches bucket limit)
   const SOFT_LIMIT_BYTES = 50 * 1024 * 1024; // warn above this
@@ -144,6 +146,8 @@ export default function CreateScreen() {
       setImageBase64(null);
       setImageUri(null);
       setIsVideo(false);
+      setShowCustomInput(false);
+      setCustomCategory("");
       queryClient.invalidateQueries({ queryKey: ["feed"] });
       queryClient.invalidateQueries({ queryKey: ["userPosts", userId] });
       Alert.alert("Posted! 🔥", "Your Try is live.");
@@ -228,12 +232,61 @@ export default function CreateScreen() {
             <TouchableOpacity
               key={c}
               style={[styles.categoryChip, category === c && styles.categoryChipActive]}
-              onPress={() => setCategory(c)}
+              onPress={() => {
+                setCategory(c);
+                setShowCustomInput(false);
+                setCustomCategory("");
+              }}
             >
               <Text style={[styles.categoryText, category === c && styles.categoryTextActive]}>{c}</Text>
             </TouchableOpacity>
           ))}
+          {/* Custom category pill — dashed border, orange text */}
+          <TouchableOpacity
+            style={[
+              styles.categoryChip,
+              showCustomInput && styles.customChipActive,
+            ]}
+            onPress={() => {
+              setShowCustomInput(true);
+              if (customCategory) {
+                setCategory(customCategory);
+              } else {
+                setCategory("");
+              }
+            }}
+          >
+            <Text style={[styles.categoryText, styles.customChipText, showCustomInput && styles.categoryTextActive]}>
+              + Custom
+            </Text>
+          </TouchableOpacity>
+          {/* Show the selected custom category as an orange pill */}
+          {showCustomInput && customCategory.length > 0 && category === customCategory && (
+            <View style={[styles.categoryChip, styles.categoryChipActive]}>
+              <Text style={[styles.categoryText, styles.categoryTextActive]}>{customCategory}</Text>
+            </View>
+          )}
         </View>
+        {showCustomInput && (
+          <TextInput
+            style={[styles.input, styles.customInput]}
+            placeholder="Type your category... (e.g. Birdwatching)"
+            placeholderTextColor={Colors.inactiveIcon}
+            value={customCategory}
+            onChangeText={(text) => {
+              const cleaned = text.trim().split("\s")[0];
+              setCustomCategory(cleaned);
+              if (cleaned.length > 0) {
+                setCategory(cleaned);
+              } else {
+                setCategory("");
+              }
+            }}
+            maxLength={20}
+            autoCapitalize="words"
+            autoCorrect={false}
+          />
+        )}
 
         <Text style={styles.label}>Location (optional)</Text>
         <TextInput
@@ -382,6 +435,17 @@ const styles = StyleSheet.create({
   categoryChipActive: {
     backgroundColor: "rgba(255,106,0,0.15)",
     borderColor: Colors.flameOrange,
+  },
+  customChipActive: {
+    borderStyle: "dashed" as const,
+    borderColor: Colors.flameOrange,
+    backgroundColor: "rgba(255,106,0,0.10)",
+  },
+  customChipText: {
+    color: Colors.flameOrange,
+  },
+  customInput: {
+    marginTop: 8,
   },
   categoryText: {
     color: Colors.mutedText,
