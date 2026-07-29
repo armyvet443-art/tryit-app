@@ -18,9 +18,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Avatar from "@/components/Avatar";
 import EmptyState from "@/components/EmptyState";
 import Colors from "@/constants/colors";
+import { useAuth } from "@/providers/AuthProvider";
 import {
   fetchCategoriesWithCounts,
   fetchFeed,
+  filterBlockedPosts,
+  getBlockedUserIds,
   getPostsByCategory,
   searchPosts,
   searchUsers,
@@ -32,6 +35,7 @@ import { formatCount } from "@/utils/format";
 type SearchMode = "posts" | "users";
 
 export default function ExploreScreen() {
+  const { userId, guestId } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState<string>("");
@@ -40,6 +44,13 @@ export default function ExploreScreen() {
 
   const trimmed = query.trim();
   const searching = trimmed.length > 0;
+
+  // Fetch blocked user IDs to filter them from explore results.
+  const blockedQuery = useQuery<Set<string>>({
+    queryKey: ["blockedIds", userId, guestId],
+    queryFn: () => getBlockedUserIds(userId, guestId),
+    staleTime: 30_000,
+  });
 
   const trendingQuery = useQuery<TryPost[]>({
     queryKey: ["explore-trending"],
@@ -92,10 +103,11 @@ export default function ExploreScreen() {
   });
 
   const gridPosts = useMemo(() => {
-    if (searching) return postResults.data ?? [];
-    if (category) return categoryQuery.data ?? [];
-    return trendingQuery.data ?? [];
-  }, [searching, category, postResults.data, categoryQuery.data, trendingQuery.data]);
+    const blocked = blockedQuery.data ?? new Set();
+    if (searching) return filterBlockedPosts(postResults.data ?? [], blocked);
+    if (category) return filterBlockedPosts(categoryQuery.data ?? [], blocked);
+    return filterBlockedPosts(trendingQuery.data ?? [], blocked);
+  }, [searching, category, postResults.data, categoryQuery.data, trendingQuery.data, blockedQuery.data]);
 
   const isLoading =
     (searching && mode === "posts" && postResults.isLoading) ||

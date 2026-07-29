@@ -1,16 +1,18 @@
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Bookmark, Flag, MapPin, MessageCircle, MoreHorizontal, Play, Share2, Trash2, Pencil } from "lucide-react-native";
+import { Bookmark, Flag, MapPin, MessageCircle, MoreHorizontal, Play, Share2, ShieldOff, Trash2, Pencil } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Modal,
- Platform,
+  Platform,
   Share,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -20,7 +22,10 @@ import FollowButton from "@/components/FollowButton";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import {
+  blockUser,
   deletePost,
+  reportPost,
+  REPORT_REASONS,
   setSaved,
   setTried,
   toggleFire,
@@ -51,6 +56,7 @@ interface PostCardProps {
   fired?: boolean;
   fireCount?: number;
   onDeleted?: (postId: string) => void;
+  onBlocked?: (blockedUserId: string) => void;
 }
 
 export default function PostCard({
@@ -64,6 +70,7 @@ export default function PostCard({
   fired = false,
   fireCount = 0,
   onDeleted,
+  onBlocked,
 }: PostCardProps) {
   const { userId, guestId } = useAuth();
   const router = useRouter();
@@ -73,6 +80,11 @@ export default function PostCard({
 
   const [menuVisible, setMenuVisible] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [reportVisible, setReportVisible] = useState<boolean>(false);
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [reportDetails, setReportDetails] = useState<string>("");
+  const [isReporting, setIsReporting] = useState<boolean>(false);
+  const [isBlocking, setIsBlocking] = useState<boolean>(false);
 
   const [reaction, setReaction] = useState<ReactionType | null>(myReaction);
   const [counts, setCounts] = useState<ReactionCounts>(
@@ -222,8 +234,66 @@ export default function PostCard({
 
   const handleReport = useCallback(() => {
     setMenuVisible(false);
-    Alert.alert("Report", "Reporting is coming soon. Thanks for helping keep TryIt safe!");
+    setReportVisible(true);
   }, []);
+
+  const handleSelectReason = useCallback((reason: string) => {
+    setSelectedReason(reason);
+  }, []);
+
+  const handleSubmitReport = useCallback(async () => {
+    if (!selectedReason || isReporting) return;
+    setIsReporting(true);
+    try {
+      await reportPost(
+        post.id,
+        selectedReason,
+        selectedReason === "Other" ? reportDetails.trim() || null : null,
+        userId,
+        guestId,
+      );
+      setReportVisible(false);
+      setSelectedReason(null);
+      setReportDetails("");
+      Alert.alert("Reported", "Thanks for reporting — we reviewed and will take action if needed.");
+    } catch (e) {
+      console.log("[report] failed", e);
+      Alert.alert("Error", "Could not submit report. Please try again.");
+    } finally {
+      setIsReporting(false);
+    }
+  }, [selectedReason, isReporting, post.id, reportDetails, userId, guestId]);
+
+  const handleBlock = useCallback(() => {
+    setMenuVisible(false);
+    if (!post.user_id || (userId && post.user_id === userId)) return; // Prevent self-block
+    const username = post.author?.username ?? "user";
+    Alert.alert(
+      `Block @${username}?`,
+      "You won't see their posts anymore. You can unblock in Settings.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: async () => {
+            if (isBlocking) return;
+            setIsBlocking(true);
+            try {
+              await blockUser(post.user_id, userId, guestId);
+              if (onBlocked) onBlocked(post.user_id);
+              Alert.alert("Blocked", `@${username} has been blocked.`);
+            } catch (e) {
+              console.log("[block] failed", e);
+              Alert.alert("Error", "Could not block this user. Please try again.");
+            } finally {
+              setIsBlocking(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [post.user_id, post.author?.username, userId, guestId, isBlocking, onBlocked]);
 
   const openAuthor = useCallback(() => {
     router.push({ pathname: "/user/[id]", params: { id: post.user_id } });
@@ -421,12 +491,100 @@ export default function PostCard({
                 </TouchableOpacity>
               </>
             ) : (
-              <TouchableOpacity style={styles.menuItem} onPress={handleReport} testID={`report-post-${post.id}`}>
-                <Flag size={20} color={Colors.mutedText} />
-                <Text style={styles.menuItemText}>Report</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity style={styles.menuItem} onPress={handleReport} testID={`report-post-${post.id}`}>
+                  <Flag size={20} color={Colors.mutedText} />
+                  <Text style={styles.menuItemText}>Report Post</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={handleBlock} testID={`block-user-${post.id}`} disabled={isBlocking}>
+                  <ShieldOff size={20} color={Colors.error} />
+                  <Text style={[styles.menuItemText, { color: Colors.error }]}>Block @{post.author?.username ?? "user"}</Text>
+                </TouchableOpacity>
+              </>
             )}
             <TouchableOpacity style={[styles.menuItem, styles.menuItemLast]} onPress={() => setMenuVisible(false)}>
+              <Text style={[styles.menuItemText, { color: Colors.mutedText }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Report modal */}
+      <Modal
+        visible={reportVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isReporting) setReportVisible(false);
+        }}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => {
+            if (!isReporting) setReportVisible(false);
+          }}
+        >
+          <View style={styles.reportSheet}>
+            <Text style={styles.reportTitle}>Report Post</Text>
+            <Text style={styles.reportSubtitle}>Why are you reporting this?</Text>
+            {REPORT_REASONS.map((reason) => (
+              <TouchableOpacity
+                key={reason}
+                style={[
+                  styles.reasonRow,
+                  selectedReason === reason && styles.reasonRowSelected,
+                ]}
+                onPress={() => handleSelectReason(reason)}
+              >
+                <Text
+                  style={[
+                    styles.reasonText,
+                    selectedReason === reason && styles.reasonTextSelected,
+                  ]}
+                >
+                  {reason}
+                </Text>
+                {selectedReason === reason ? (
+                  <Text style={styles.reasonCheck}>✓</Text>
+                ) : null}
+              </TouchableOpacity>
+            ))}
+            {selectedReason === "Other" ? (
+              <TextInput
+                style={styles.reportInput}
+                placeholder="Tell us more (optional)"
+                placeholderTextColor={Colors.inactiveIcon}
+                value={reportDetails}
+                onChangeText={setReportDetails}
+                maxLength={500}
+                multiline
+              />
+            ) : null}
+            <TouchableOpacity
+              style={[
+                styles.reportSubmitBtn,
+                (!selectedReason || isReporting) && styles.reportSubmitDisabled,
+              ]}
+              onPress={handleSubmitReport}
+              disabled={!selectedReason || isReporting}
+            >
+              {isReporting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.reportSubmitText}>Submit Report</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuItem, styles.menuItemLast]}
+              onPress={() => {
+                if (!isReporting) {
+                  setReportVisible(false);
+                  setSelectedReason(null);
+                  setReportDetails("");
+                }
+              }}
+            >
               <Text style={[styles.menuItemText, { color: Colors.mutedText }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -721,5 +879,86 @@ const styles = StyleSheet.create({
   iconCount: {
     color: Colors.mutedText,
     fontSize: 12,
+  },
+  reportSheet: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    marginHorizontal: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  reportTitle: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: "800" as const,
+    textAlign: "center",
+    paddingTop: 22,
+    paddingHorizontal: 20,
+  },
+  reportSubtitle: {
+    color: Colors.mutedText,
+    fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    paddingBottom: 12,
+  },
+  reasonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+    minHeight: 48,
+  },
+  reasonRowSelected: {
+    backgroundColor: "rgba(255,106,0,0.1)",
+  },
+  reasonText: {
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: "500" as const,
+  },
+  reasonTextSelected: {
+    color: Colors.flameOrange,
+    fontWeight: "700" as const,
+  },
+  reasonCheck: {
+    color: Colors.flameOrange,
+    fontSize: 16,
+    fontWeight: "800" as const,
+  },
+  reportInput: {
+    backgroundColor: Colors.softGray,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    marginHorizontal: 20,
+    marginVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: Colors.text,
+    fontSize: 14,
+    minHeight: 60,
+    maxHeight: 100,
+  },
+  reportSubmitBtn: {
+    backgroundColor: Colors.flameOrange,
+    marginHorizontal: 20,
+    marginVertical: 10,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  reportSubmitDisabled: {
+    opacity: 0.5,
+  },
+  reportSubmitText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "800" as const,
   },
 });

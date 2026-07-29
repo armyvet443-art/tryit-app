@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, Bookmark, Flag, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react-native";
+import { ArrowLeft, Bookmark, Flag, MoreHorizontal, Pencil, Share2, ShieldOff, Trash2 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -31,6 +31,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import {
   addComment,
   addReply,
+  blockUser,
   deleteComment,
   deletePost,
   fetchPost,
@@ -42,6 +43,8 @@ import {
   getSavedSet,
   getTriedSet,
   isFired as checkIsFired,
+  reportPost,
+  REPORT_REASONS,
   setSaved,
   setTried,
   toggleFire,
@@ -85,6 +88,11 @@ export default function PostDetailScreen() {
   const [fireCount, setFireCount] = useState<number>(0);
   const [menuVisible, setMenuVisible] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [reportVisible, setReportVisible] = useState<boolean>(false);
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [reportDetails, setReportDetails] = useState<string>("");
+  const [isReporting, setIsReporting] = useState<boolean>(false);
+  const [isBlocking, setIsBlocking] = useState<boolean>(false);
   const fireScale = React.useRef(new Animated.Value(1)).current;
 
   const postQuery = useQuery<TryPost | null>({
@@ -417,8 +425,65 @@ export default function PostDetailScreen() {
 
   const handleReport = useCallback(() => {
     setMenuVisible(false);
-    Alert.alert("Report", "Reporting is coming soon. Thanks for helping keep TryIt safe!");
+    setReportVisible(true);
   }, []);
+
+  const handleSubmitReport = useCallback(async () => {
+    if (!selectedReason || isReporting || !post) return;
+    setIsReporting(true);
+    try {
+      await reportPost(
+        postId,
+        selectedReason,
+        selectedReason === "Other" ? reportDetails.trim() || null : null,
+        userId,
+        guestId,
+      );
+      setReportVisible(false);
+      setSelectedReason(null);
+      setReportDetails("");
+      Alert.alert("Reported", "Thanks for reporting — we reviewed and will take action if needed.");
+    } catch (e) {
+      console.log("[report] failed", e);
+      Alert.alert("Error", "Could not submit report. Please try again.");
+    } finally {
+      setIsReporting(false);
+    }
+  }, [selectedReason, isReporting, post, postId, reportDetails, userId, guestId]);
+
+  const handleBlock = useCallback(() => {
+    setMenuVisible(false);
+    if (!post || (userId && post.user_id === userId)) return; // Prevent self-block
+    const username = post.author?.username ?? "user";
+    Alert.alert(
+      `Block @${username}?`,
+      "You won't see their posts anymore. You can unblock in Settings.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: async () => {
+            if (isBlocking) return;
+            setIsBlocking(true);
+            try {
+              await blockUser(post.user_id, userId, guestId);
+              queryClient.invalidateQueries({ queryKey: ["feed"] });
+              queryClient.invalidateQueries({ queryKey: ["explore-trending"] });
+              queryClient.invalidateQueries({ queryKey: ["explore-category"] });
+              Alert.alert("Blocked", `@${username} has been blocked.`);
+              router.back();
+            } catch (e) {
+              console.log("[block] failed", e);
+              Alert.alert("Error", "Could not block this user. Please try again.");
+            } finally {
+              setIsBlocking(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [post, userId, guestId, isBlocking, queryClient, router]);
 
   const openAuthor = useCallback(() => {
     if (post) router.push({ pathname: "/user/[id]", params: { id: post.user_id } });
@@ -704,12 +769,100 @@ export default function PostDetailScreen() {
                 </TouchableOpacity>
               </>
             ) : (
-              <TouchableOpacity style={styles.menuItem} onPress={handleReport} testID={`report-post-detail-${post.id}`}>
-                <Flag size={20} color={Colors.mutedText} />
-                <Text style={styles.menuItemText}>Report</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity style={styles.menuItem} onPress={handleReport} testID={`report-post-detail-${post.id}`}>
+                  <Flag size={20} color={Colors.mutedText} />
+                  <Text style={styles.menuItemText}>Report Post</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={handleBlock} testID={`block-user-detail-${post.id}`} disabled={isBlocking}>
+                  <ShieldOff size={20} color={Colors.error} />
+                  <Text style={[styles.menuItemText, { color: Colors.error }]}>Block @{post.author?.username ?? "user"}</Text>
+                </TouchableOpacity>
+              </>
             )}
             <TouchableOpacity style={[styles.menuItem, styles.menuItemLast]} onPress={() => setMenuVisible(false)}>
+              <Text style={[styles.menuItemText, { color: Colors.mutedText }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Report modal */}
+      <Modal
+        visible={reportVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isReporting) setReportVisible(false);
+        }}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => {
+            if (!isReporting) setReportVisible(false);
+          }}
+        >
+          <View style={styles.reportSheet}>
+            <Text style={styles.reportTitle}>Report Post</Text>
+            <Text style={styles.reportSubtitle}>Why are you reporting this?</Text>
+            {REPORT_REASONS.map((reason) => (
+              <TouchableOpacity
+                key={reason}
+                style={[
+                  styles.reasonRow,
+                  selectedReason === reason && styles.reasonRowSelected,
+                ]}
+                onPress={() => setSelectedReason(reason)}
+              >
+                <Text
+                  style={[
+                    styles.reasonText,
+                    selectedReason === reason && styles.reasonTextSelected,
+                  ]}
+                >
+                  {reason}
+                </Text>
+                {selectedReason === reason ? (
+                  <Text style={styles.reasonCheck}>✓</Text>
+                ) : null}
+              </TouchableOpacity>
+            ))}
+            {selectedReason === "Other" ? (
+              <TextInput
+                style={styles.reportInput}
+                placeholder="Tell us more (optional)"
+                placeholderTextColor={Colors.inactiveIcon}
+                value={reportDetails}
+                onChangeText={setReportDetails}
+                maxLength={500}
+                multiline
+              />
+            ) : null}
+            <TouchableOpacity
+              style={[
+                styles.reportSubmitBtn,
+                (!selectedReason || isReporting) && styles.reportSubmitDisabled,
+              ]}
+              onPress={handleSubmitReport}
+              disabled={!selectedReason || isReporting}
+            >
+              {isReporting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.reportSubmitText}>Submit Report</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuItem, styles.menuItemLast]}
+              onPress={() => {
+                if (!isReporting) {
+                  setReportVisible(false);
+                  setSelectedReason(null);
+                  setReportDetails("");
+                }
+              }}
+            >
               <Text style={[styles.menuItemText, { color: Colors.mutedText }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -1069,6 +1222,87 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loginButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "800" as const,
+  },
+  reportSheet: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    marginHorizontal: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  reportTitle: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: "800" as const,
+    textAlign: "center",
+    paddingTop: 22,
+    paddingHorizontal: 20,
+  },
+  reportSubtitle: {
+    color: Colors.mutedText,
+    fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    paddingBottom: 12,
+  },
+  reasonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+    minHeight: 48,
+  },
+  reasonRowSelected: {
+    backgroundColor: "rgba(255,106,0,0.1)",
+  },
+  reasonText: {
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: "500" as const,
+  },
+  reasonTextSelected: {
+    color: Colors.flameOrange,
+    fontWeight: "700" as const,
+  },
+  reasonCheck: {
+    color: Colors.flameOrange,
+    fontSize: 16,
+    fontWeight: "800" as const,
+  },
+  reportInput: {
+    backgroundColor: Colors.softGray,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    marginHorizontal: 20,
+    marginVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: Colors.text,
+    fontSize: 14,
+    minHeight: 60,
+    maxHeight: 100,
+  },
+  reportSubmitBtn: {
+    backgroundColor: Colors.flameOrange,
+    marginHorizontal: 20,
+    marginVertical: 10,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  reportSubmitDisabled: {
+    opacity: 0.5,
+  },
+  reportSubmitText: {
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "800" as const,

@@ -6,6 +6,7 @@ import {
   KeyRound,
   LogOut,
   Shield,
+  ShieldOff,
   Trash2,
   UserPen,
 } from "lucide-react-native";
@@ -112,6 +113,15 @@ export default function SettingsScreen() {
           icon={<KeyRound size={20} color={Colors.text} />}
           label="Change Password"
           onPress={handleChangePassword}
+        />
+      </View>
+
+      <Text style={styles.sectionHeader}>SAFETY</Text>
+      <View style={styles.section}>
+        <SettingsRow
+          icon={<ShieldOff size={20} color={Colors.text} />}
+          label="Blocked Users"
+          onPress={() => router.push("/settings/blocked")}
         />
       </View>
 

@@ -1073,6 +1073,182 @@ export async function updatePost(
   if (error) throw error;
 }
 
+// ─── Reports & Blocks ─────────────────────────────────────────────────────
+
+export const REPORT_REASONS: string[] = [
+  "Spam",
+  "Harassment or Hate",
+  "Nudity or Sexual",
+  "False Information",
+  "Other",
+];
+
+/** Report a post. Pass the reporter's userId or guestId. */
+export async function reportPost(
+  postId: string,
+  reason: string,
+  details: string | null,
+  userId: string | null,
+  guestId: string,
+): Promise<void> {
+  const row: Record<string, unknown> = {
+    post_id: postId,
+    reason,
+    details: details ?? null,
+  };
+  if (userId) {
+    row.reporter_id = userId;
+    row.reporter_guest_id = null;
+  } else {
+    row.reporter_guest_id = guestId;
+    row.reporter_id = null;
+  }
+  const { error } = await supabase.from("reports").insert(row);
+  if (error) {
+    console.log("[reportPost] error", postId, error.message);
+    throw error;
+  }
+}
+
+/** Report a user (not tied to a specific post). */
+export async function reportUser(
+  reportedUserId: string,
+  reason: string,
+  details: string | null,
+  userId: string | null,
+  guestId: string,
+): Promise<void> {
+  const row: Record<string, unknown> = {
+    reported_user_id: reportedUserId,
+    reason,
+    details: details ?? null,
+  };
+  if (userId) {
+    row.reporter_id = userId;
+    row.reporter_guest_id = null;
+  } else {
+    row.reporter_guest_id = guestId;
+    row.reporter_id = null;
+  }
+  const { error } = await supabase.from("reports").insert(row);
+  if (error) {
+    console.log("[reportUser] error", reportedUserId, error.message);
+    throw error;
+  }
+}
+
+/** Block a user. Prevents self-block and handles unique constraint violations gracefully. */
+export async function blockUser(
+  blockedUserId: string,
+  userId: string | null,
+  guestId: string,
+): Promise<void> {
+  if (userId && blockedUserId === userId) return; // Prevent self-block
+  const row: Record<string, unknown> = {
+    blocked_id: blockedUserId,
+  };
+  if (userId) {
+    row.blocker_id = userId;
+    row.blocker_guest_id = null;
+  } else {
+    row.blocker_guest_id = guestId;
+    row.blocker_id = null;
+  }
+  const { error } = await supabase.from("blocks").insert(row);
+  if (error) {
+    // 23505 = unique constraint violation — already blocked, that's fine
+    if (error.code !== "23505") {
+      console.log("[blockUser] error", blockedUserId, error.message);
+      throw error;
+    }
+  }
+}
+
+/** Unblock a user. */
+export async function unblockUser(
+  blockedUserId: string,
+  userId: string | null,
+  guestId: string,
+): Promise<void> {
+  let query = supabase.from("blocks").delete().eq("blocked_id", blockedUserId);
+  if (userId) {
+    query = query.eq("blocker_id", userId);
+  } else {
+    query = query.eq("blocker_guest_id", guestId).is("blocker_id", null);
+  }
+  const { error } = await query;
+  if (error) {
+    console.log("[unblockUser] error", blockedUserId, error.message);
+    throw error;
+  }
+}
+
+/** Fetch the set of blocked user IDs for the current user/guest. */
+export async function getBlockedUserIds(
+  userId: string | null,
+  guestId: string,
+): Promise<Set<string>> {
+  let query = supabase.from("blocks").select("blocked_id");
+  if (userId) {
+    query = query.eq("blocker_id", userId);
+  } else {
+    query = query.eq("blocker_guest_id", guestId).is("blocker_id", null);
+  }
+  const { data, error } = await query;
+  if (error) {
+    console.log("[getBlockedUserIds] error", error.message);
+    return new Set();
+  }
+  return new Set((data ?? []).map((r: Record<string, unknown>) => String(r.blocked_id)));
+}
+
+/** Fetch blocked users with profile info for the settings screen. */
+export interface BlockedUser {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string;
+}
+
+export async function getBlockedUsers(
+  userId: string | null,
+  guestId: string,
+): Promise<BlockedUser[]> {
+  let query = supabase.from("blocks").select("blocked_id");
+  if (userId) {
+    query = query.eq("blocker_id", userId);
+  } else {
+    query = query.eq("blocker_guest_id", guestId).is("blocker_id", null);
+  }
+  const { data, error } = await query;
+  if (error) {
+    console.log("[getBlockedUsers] error", error.message);
+    return [];
+  }
+  const blockedIds = ((data ?? []) as Record<string, unknown>[]).map((r) => String(r.blocked_id));
+  if (blockedIds.length === 0) return [];
+  const { data: profiles, error: profileError } = await supabase
+    .from("user_profiles")
+    .select("id, username, display_name, avatar_url")
+    .in("id", blockedIds);
+  if (profileError) {
+    console.log("[getBlockedUsers] profile error", profileError.message);
+    return [];
+  }
+  return ((profiles ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    username: String(r.username ?? ""),
+    display_name: String(r.display_name ?? ""),
+    avatar_url: String(r.avatar_url ?? ""),
+  }));
+}
+
+/** Filter posts to exclude those from blocked users (client-side). */
+export function filterBlockedPosts(posts: TryPost[], blockedIds: Set<string>): TryPost[] {
+  if (blockedIds.size === 0) return posts;
+  return posts.filter((p) => !blockedIds.has(p.user_id));
+}
+
 // ─── Account ──────────────────────────────────────────────────────────────
 
 export async function deleteAccount(userId: string): Promise<void> {

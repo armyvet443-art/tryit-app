@@ -20,6 +20,8 @@ import { useAuth } from "@/providers/AuthProvider";
 import {
   FeedType,
   fetchFeed,
+  filterBlockedPosts,
+  getBlockedUserIds,
   getFireCountsBatch,
   getFollowingIds,
   getGuestFires,
@@ -55,7 +57,16 @@ export default function FeedScreen() {
     queryFn: () => fetchFeed(feedType, userId, 0, PAGE_SIZE),
   });
 
-  const posts = useMemo(() => feedQuery.data ?? [], [feedQuery.data]);
+  // Fetch blocked user IDs so we can filter them from the feed (client-side).
+  const blockedQuery = useQuery<Set<string>>({
+    queryKey: ["blockedIds", userId, guestId],
+    queryFn: () => getBlockedUserIds(userId, guestId),
+  });
+
+  const posts = useMemo(
+    () => filterBlockedPosts(feedQuery.data ?? [], blockedQuery.data ?? new Set()),
+    [feedQuery.data, blockedQuery.data],
+  );
   const postIds = useMemo(() => posts.map((p) => p.id), [posts]);
   const postIdsKey = postIds.join(",");
 
@@ -145,6 +156,27 @@ export default function FeedScreen() {
     [queryClient],
   );
 
+  const handleUserBlocked = useCallback(
+    (blockedUserId: string) => {
+      // Optimistic: remove all posts from the blocked user from local caches
+      queryClient.setQueriesData<TryPost[]>(
+        { queryKey: ["feed"] },
+        (old) => (old ? old.filter((p) => p.user_id !== blockedUserId) : old),
+      );
+      queryClient.setQueriesData<TryPost[]>(
+        { queryKey: ["explore-trending"] },
+        (old) => (old ? old.filter((p) => p.user_id !== blockedUserId) : old),
+      );
+      queryClient.setQueriesData<TryPost[]>(
+        { queryKey: ["explore-category"] },
+        (old) => (old ? old.filter((p) => p.user_id !== blockedUserId) : old),
+      );
+      // Invalidate blocked IDs so the filter stays in sync on next fetch
+      queryClient.invalidateQueries({ queryKey: ["blockedIds"] });
+    },
+    [queryClient],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: TryPost }) => (
       <PostCard
@@ -157,9 +189,10 @@ export default function FeedScreen() {
         fired={myFiresQuery.data?.has(item.id) ?? false}
         fireCount={fireCountsQuery.data?.[item.id] ?? 0}
         onDeleted={handlePostDeleted}
+        onBlocked={handleUserBlocked}
       />
     ),
-    [reactionsQuery.data, countsQuery.data, triedQuery.data, savedQuery.data, followingQuery.data, myFiresQuery.data, fireCountsQuery.data, handlePostDeleted],
+    [reactionsQuery.data, countsQuery.data, triedQuery.data, savedQuery.data, followingQuery.data, myFiresQuery.data, fireCountsQuery.data, handlePostDeleted, handleUserBlocked],
   );
 
   return (
