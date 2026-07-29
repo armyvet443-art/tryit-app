@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { Bookmark, MapPin, MessageCircle, Play, Share2 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  Animated,
   Platform,
   Share,
   StyleSheet,
@@ -17,9 +18,9 @@ import FollowButton from "@/components/FollowButton";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import {
-  deleteReaction,
   setSaved,
   setTried,
+  toggleFire,
   upsertReaction,
 } from "@/services/tryit-service";
 import { REACTION_META, ReactionType, TryPost } from "@/types/models";
@@ -44,6 +45,8 @@ interface PostCardProps {
   saved: boolean;
   isFollowingAuthor: boolean;
   showFollow?: boolean;
+  fired?: boolean;
+  fireCount?: number;
 }
 
 export default function PostCard({
@@ -54,6 +57,8 @@ export default function PostCard({
   saved,
   isFollowingAuthor,
   showFollow = true,
+  fired = false,
+  fireCount = 0,
 }: PostCardProps) {
   const { userId, guestId } = useAuth();
   const router = useRouter();
@@ -71,10 +76,15 @@ export default function PostCard({
   const [triedCount, setTriedCount] = useState<number>(post.tried_count);
   const [isSaved, setIsSaved] = useState<boolean>(saved);
   const [expanded, setExpanded] = useState<boolean>(false);
+  const [isFired, setIsFired] = useState<boolean>(fired);
+  const [fireCountState, setFireCountState] = useState<number>(fireCount);
+  const fireScale = React.useRef(new Animated.Value(1)).current;
 
   useEffect(() => setReaction(myReaction), [myReaction]);
   useEffect(() => setIsTried(tried), [tried]);
   useEffect(() => setIsSaved(saved), [saved]);
+  useEffect(() => setIsFired(fired), [fired]);
+  useEffect(() => setFireCountState(fireCount), [fireCount]);
   // Sync counts from the shared feed batch when they change and we're not
   // mid-interaction (reaction === myReaction means no local pending change).
   useEffect(() => {
@@ -139,6 +149,25 @@ export default function PostCard({
       setIsSaved(!next);
     }
   }, [isSaved, post.id, userId, router]);
+
+  const handleFire = useCallback(async () => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Animated.sequence([
+      Animated.timing(fireScale, { toValue: 1.3, duration: 80, useNativeDriver: true }),
+      Animated.spring(fireScale, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
+    ]).start();
+    const next = !isFired;
+    setIsFired(next);
+    setFireCountState((c) => Math.max(0, c + (next ? 1 : -1)));
+    try {
+      const freshCount = await toggleFire(post.id, userId, guestId);
+      setFireCountState(freshCount);
+    } catch (e) {
+      console.log("[fire] toggle failed", e);
+      setIsFired(!next);
+      setFireCountState((c) => Math.max(0, c + (next ? -1 : 1)));
+    }
+  }, [isFired, fireScale, post.id, userId, guestId]);
 
   const handleShare = useCallback(() => {
     Share.share({ message: `${post.title} — see it on TryIt!` }).catch(() => {});
@@ -251,6 +280,25 @@ export default function PostCard({
 
       {/* Actions */}
       <View style={styles.actionsRow}>
+        <TouchableOpacity
+          style={styles.fireButton}
+          onPress={handleFire}
+          testID={`fire-button-${post.id}`}
+          activeOpacity={0.7}
+        >
+          <Animated.Text
+            style={[
+              styles.fireEmoji,
+              { transform: [{ scale: fireScale }] },
+              isFired && styles.fireEmojiActive,
+            ]}
+          >
+            🔥
+          </Animated.Text>
+          <Text style={[styles.fireCount, isFired && styles.fireCountActive]}>
+            {formatCount(fireCountState)}
+          </Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.triedButton, isTried && styles.triedButtonActive]}
           onPress={handleTried}
@@ -450,13 +498,41 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 8,
     paddingHorizontal: 12,
     paddingTop: 12,
   },
-  triedButton: {
+  fireButton: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.surfaceVariant,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  fireEmoji: {
+    fontSize: 16,
+    opacity: 0.5,
+  },
+  fireEmojiActive: {
+    opacity: 1,
+  },
+  fireCount: {
+    color: Colors.mutedText,
+    fontSize: 13,
+    fontWeight: "700" as const,
+  },
+  fireCountActive: {
+    color: Colors.flameOrange,
+  },
+  triedButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
     backgroundColor: Colors.surfaceVariant,
     paddingHorizontal: 14,

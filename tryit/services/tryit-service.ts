@@ -68,6 +68,7 @@ function mapPost(row: Record<string, unknown>): TryPost {
     not_for_me_count: num(row.not_for_me_count),
     comment_count: num(row.comment_count),
     tried_count: num(row.tried_count),
+    likes_count: num(row.likes_count),
     created_at: String(row.created_at ?? ""),
     author: mapAuthor(row.user_profiles as Record<string, unknown> | null),
   };
@@ -335,6 +336,183 @@ export async function getGuestReactions(
     map[String(r.post_id)] = String(r.reaction_type) as ReactionType;
   });
   return map;
+}
+
+// ─── Fire (Likes) ────────────────────────────────────────────────────────
+// Direct table operations on the `post_likes` table — no RPC needed.
+// The Fire button is TryIt's signature like: tap to toggle a 🔥 on any post.
+
+/** Toggle fire on/off for a post. Returns the updated like count. */
+export async function toggleFire(
+  postId: string,
+  userId: string | null,
+  guestId: string,
+): Promise<number> {
+  // Check if already fired
+  let alreadyFired = false;
+  if (userId) {
+    const { data, error } = await supabase
+      .from("post_likes")
+      .select("id")
+      .eq("post_id", postId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) {
+      console.log("[toggleFire] check error", postId, error.message);
+      throw error;
+    }
+    alreadyFired = !!data;
+  } else {
+    const { data, error } = await supabase
+      .from("post_likes")
+      .select("id")
+      .eq("post_id", postId)
+      .eq("guest_id", guestId)
+      .is("user_id", null)
+      .maybeSingle();
+    if (error) {
+      console.log("[toggleFire] check error", postId, error.message);
+      throw error;
+    }
+    alreadyFired = !!data;
+  }
+
+  if (alreadyFired) {
+    // Unfire — delete the row
+    if (userId) {
+      const { error } = await supabase
+        .from("post_likes")
+        .delete()
+        .eq("post_id", postId)
+        .eq("user_id", userId);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from("post_likes")
+        .delete()
+        .eq("post_id", postId)
+        .eq("guest_id", guestId)
+        .is("user_id", null);
+      if (error) throw error;
+    }
+  } else {
+    // Fire — insert a new row
+    const row: Record<string, unknown> = {
+      post_id: postId,
+      type: "fire",
+    };
+    if (userId) {
+      row.user_id = userId;
+      row.guest_id = null;
+    } else {
+      row.guest_id = guestId;
+      row.user_id = null;
+    }
+    const { error } = await supabase.from("post_likes").insert(row);
+    if (error) {
+      console.log("[toggleFire] insert error", postId, error.message);
+      throw error;
+    }
+  }
+
+  // Return fresh count
+  const count = await getFireCount(postId);
+  console.log("[toggleFire] done", postId, "fired=" + !alreadyFired, "count=" + count);
+  return count;
+}
+
+/** Count total fires on a post. */
+export async function getFireCount(postId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("post_likes")
+    .select("id", { count: "exact", head: true })
+    .eq("post_id", postId);
+  if (error) {
+    console.log("[getFireCount] error", postId, error.message);
+    return 0;
+  }
+  return count ?? 0;
+}
+
+/** Batch-fetch fire counts for many posts (used by the feed). */
+export async function getFireCountsBatch(
+  postIds: string[],
+): Promise<Record<string, number>> {
+  if (postIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from("post_likes")
+    .select("post_id")
+    .in("post_id", postIds);
+  if (error) {
+    console.log("[getFireCountsBatch] error", error.message);
+    return {};
+  }
+  const map: Record<string, number> = {};
+  for (const id of postIds) map[id] = 0;
+  for (const r of (data ?? []) as Record<string, unknown>[]) {
+    const pid = String(r.post_id);
+    if (!map[pid]) map[pid] = 0;
+    map[pid] += 1;
+  }
+  return map;
+}
+
+/** Check which posts the current user has fired. */
+export async function getMyFires(
+  postIds: string[],
+  userId: string,
+): Promise<Set<string>> {
+  if (postIds.length === 0) return new Set();
+  const { data, error } = await supabase
+    .from("post_likes")
+    .select("post_id")
+    .eq("user_id", userId)
+    .in("post_id", postIds);
+  if (error) throw error;
+  return new Set((data ?? []).map((r: Record<string, unknown>) => String(r.post_id)));
+}
+
+/** Check which posts a guest has fired. */
+export async function getGuestFires(
+  postIds: string[],
+  guestId: string,
+): Promise<Set<string>> {
+  if (postIds.length === 0) return new Set();
+  const { data, error } = await supabase
+    .from("post_likes")
+    .select("post_id")
+    .eq("guest_id", guestId)
+    .is("user_id", null)
+    .in("post_id", postIds);
+  if (error) return new Set();
+  return new Set((data ?? []).map((r: Record<string, unknown>) => String(r.post_id)));
+}
+
+/** Check if a single post is fired by the current user/guest. */
+export async function isFired(
+  postId: string,
+  userId: string | null,
+  guestId: string,
+): Promise<boolean> {
+  if (userId) {
+    const { data, error } = await supabase
+      .from("post_likes")
+      .select("id")
+      .eq("post_id", postId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) return false;
+    return !!data;
+  }
+  const { data, error } = await supabase
+    .from("post_likes")
+    .select("id")
+    .eq("post_id", postId)
+    .eq("guest_id", guestId)
+    .is("user_id", null)
+    .maybeSingle();
+  if (error) return false;
+  return !!data;
 }
 
 // ─── Tried This / Saved ───────────────────────────────────────────────────

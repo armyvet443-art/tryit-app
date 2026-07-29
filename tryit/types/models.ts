@@ -26,6 +26,7 @@ export interface TryPost {
   not_for_me_count: number;
   comment_count: number;
   tried_count: number;
+  likes_count: number;
   created_at: string;
   author: AuthorProfile | null;
 }

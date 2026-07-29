@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -38,8 +39,10 @@ import {
   getReactionCounts,
   getSavedSet,
   getTriedSet,
+  isFired as checkIsFired,
   setSaved,
   setTried,
+  toggleFire,
   upsertReaction,
 } from "@/services/tryit-service";
 import type { CommentItem, ReactionType, TryPost } from "@/types/models";
@@ -73,6 +76,9 @@ export default function PostDetailScreen() {
   const [isTried, setIsTried] = useState<boolean>(false);
   const [triedCount, setTriedCount] = useState<number>(0);
   const [isSaved, setIsSaved] = useState<boolean>(false);
+  const [isFired, setIsFired] = useState<boolean>(false);
+  const [fireCount, setFireCount] = useState<number>(0);
+  const fireScale = React.useRef(new Animated.Value(1)).current;
 
   const postQuery = useQuery<TryPost | null>({
     queryKey: ["post", postId],
@@ -149,6 +155,20 @@ export default function PostDetailScreen() {
     enabled: postId.length > 0,
   });
 
+  const fireQuery = useQuery<{ fired: boolean; count: number }>({
+    queryKey: ["fireDetail", userId, guestId, postId],
+    queryFn: async () => {
+      const fired = await checkIsFired(postId, userId, guestId);
+      const { count, error } = await supabase
+        .from("post_likes")
+        .select("id", { count: "exact", head: true })
+        .eq("post_id", postId);
+      if (error) return { fired, count: 0 };
+      return { fired, count: count ?? 0 };
+    },
+    enabled: postId.length > 0,
+  });
+
   const followingQuery = useQuery<Set<string>>({
     queryKey: ["followingIds", userId],
     queryFn: () => getFollowingIds(userId as string),
@@ -166,6 +186,13 @@ export default function PostDetailScreen() {
   useEffect(() => {
     setIsSaved(savedQuery.data ?? false);
   }, [savedQuery.data]);
+
+  useEffect(() => {
+    if (fireQuery.data) {
+      setIsFired(fireQuery.data.fired);
+      setFireCount(fireQuery.data.count);
+    }
+  }, [fireQuery.data]);
 
   useEffect(() => {
     if (countsQuery.data) setCounts(countsQuery.data);
@@ -203,6 +230,27 @@ export default function PostDetailScreen() {
     },
     [reaction, counts, postId, userId, guestId],
   );
+
+  const handleFire = useCallback(async () => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Animated.sequence([
+      Animated.timing(fireScale, { toValue: 1.3, duration: 80, useNativeDriver: true }),
+      Animated.spring(fireScale, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
+    ]).start();
+    const next = !isFired;
+    setIsFired(next);
+    setFireCount((c) => Math.max(0, c + (next ? 1 : -1)));
+    try {
+      const freshCount = await toggleFire(postId, userId, guestId);
+      setFireCount(freshCount);
+      queryClient.invalidateQueries({ queryKey: ["fireCounts"] });
+      queryClient.invalidateQueries({ queryKey: ["myFires"] });
+    } catch (e) {
+      console.log("[fire] toggle failed", e);
+      setIsFired(!next);
+      setFireCount((c) => Math.max(0, c + (next ? -1 : 1)));
+    }
+  }, [isFired, fireScale, postId, userId, guestId, queryClient]);
 
   const handleTried = useCallback(async () => {
     if (!userId) {
@@ -411,6 +459,25 @@ export default function PostDetailScreen() {
 
         {/* Actions row */}
         <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={styles.fireButton}
+            onPress={handleFire}
+            testID={`fire-button-${post.id}`}
+            activeOpacity={0.7}
+          >
+            <Animated.Text
+              style={[
+                styles.fireEmoji,
+                { transform: [{ scale: fireScale }] },
+                isFired && styles.fireEmojiActive,
+              ]}
+            >
+              🔥
+            </Animated.Text>
+            <Text style={[styles.fireCount, isFired && styles.fireCountActive]}>
+              {formatCount(fireCount)}
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.triedButton, isTried && styles.triedButtonActive]}
             onPress={handleTried}
@@ -638,13 +705,41 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 8,
     paddingHorizontal: 16,
     paddingTop: 14,
   },
-  triedButton: {
+  fireButton: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.surfaceVariant,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  fireEmoji: {
+    fontSize: 16,
+    opacity: 0.5,
+  },
+  fireEmojiActive: {
+    opacity: 1,
+  },
+  fireCount: {
+    color: Colors.mutedText,
+    fontSize: 13,
+    fontWeight: "700" as const,
+  },
+  fireCountActive: {
+    color: Colors.flameOrange,
+  },
+  triedButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
     backgroundColor: Colors.surfaceVariant,
     paddingHorizontal: 14,

@@ -20,8 +20,11 @@ import { useAuth } from "@/providers/AuthProvider";
 import {
   FeedType,
   fetchFeed,
+  getFireCountsBatch,
   getFollowingIds,
+  getGuestFires,
   getGuestReactions,
+  getMyFires,
   getMyReactions,
   getReactionCountsBatch,
   getSavedSet,
@@ -91,6 +94,21 @@ export default function FeedScreen() {
     enabled: userId !== null,
   });
 
+  const fireCountsQuery = useQuery<Record<string, number>>({
+    queryKey: ["fireCounts", postIdsKey],
+    queryFn: () => getFireCountsBatch(postIds),
+    enabled: postIds.length > 0,
+  });
+
+  const myFiresQuery = useQuery<Set<string>>({
+    queryKey: ["myFires", userId, guestId, postIdsKey],
+    queryFn: () =>
+      userId
+        ? getMyFires(postIds, userId)
+        : getGuestFires(postIds, guestId),
+    enabled: postIds.length > 0 && (userId !== null || guestId.length > 0),
+  });
+
   const onRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["feed", feedType, userId] });
     // Also refresh reaction/tried/saved/counts state so votes persist after pull-to-refresh
@@ -98,6 +116,8 @@ export default function FeedScreen() {
     queryClient.invalidateQueries({ queryKey: ["reactionCounts"] });
     queryClient.invalidateQueries({ queryKey: ["triedSet"] });
     queryClient.invalidateQueries({ queryKey: ["savedSet"] });
+    queryClient.invalidateQueries({ queryKey: ["fireCounts"] });
+    queryClient.invalidateQueries({ queryKey: ["myFires"] });
   }, [queryClient, feedType, userId]);
 
   const renderItem = useCallback(
@@ -109,9 +129,11 @@ export default function FeedScreen() {
         tried={triedQuery.data?.has(item.id) ?? false}
         saved={savedQuery.data?.has(item.id) ?? false}
         isFollowingAuthor={followingQuery.data?.has(item.user_id) ?? false}
+        fired={myFiresQuery.data?.has(item.id) ?? false}
+        fireCount={fireCountsQuery.data?.[item.id] ?? 0}
       />
     ),
-    [reactionsQuery.data, countsQuery.data, triedQuery.data, savedQuery.data, followingQuery.data],
+    [reactionsQuery.data, countsQuery.data, triedQuery.data, savedQuery.data, followingQuery.data, myFiresQuery.data, fireCountsQuery.data],
   );
 
   return (
