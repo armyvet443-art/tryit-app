@@ -63,9 +63,10 @@ const EMPTY_COUNTS: ReactionCounts = {
 const REACTION_ORDER: ReactionType[] = ["must_try", "worth_it", "maybe", "not_for_me"];
 
 export default function PostDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, focusComment } = useLocalSearchParams<{ id: string; focusComment?: string }>();
   const postId = String(id ?? "");
   const { userId, guestId } = useAuth();
+  const shouldFocusComment = focusComment === "true";
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -73,6 +74,8 @@ export default function PostDetailScreen() {
   const [commentText, setCommentText] = useState<string>("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [sending, setSending] = useState<boolean>(false);
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+  const inputRef = React.useRef<TextInput>(null);
   const [reaction, setReaction] = useState<ReactionType | null>(null);
   const [counts, setCounts] = useState<ReactionCounts>(EMPTY_COUNTS);
   const [isTried, setIsTried] = useState<boolean>(false);
@@ -294,22 +297,24 @@ export default function PostDetailScreen() {
   }, [isSaved, postId, userId, router, queryClient]);
 
   const handleSend = useCallback(async () => {
-    if (!userId) {
-      router.push("/auth/login");
+    // Require auth or guest_id — show login modal if neither.
+    if (!userId && (!guestId || guestId.length === 0)) {
+      setShowLoginModal(true);
       return;
     }
     const text = commentText.trim();
-    if (text.length === 0) return;
+    if (text.length === 0 || sending) return;
     setSending(true);
     try {
       if (replyTo) {
-        await addReply(postId, replyTo, userId, text);
+        await addReply(postId, replyTo, text, userId, guestId);
       } else {
-        await addComment(postId, userId, text);
+        await addComment(postId, text, userId, guestId);
       }
       setCommentText("");
       setReplyTo(null);
       queryClient.invalidateQueries({ queryKey: ["comments", postId] });
+      queryClient.invalidateQueries({ queryKey: ["post", postId] });
     } catch (e) {
       console.log("[comment] failed", e);
       const message = e instanceof Error ? e.message : "Could not post comment.";
@@ -317,42 +322,59 @@ export default function PostDetailScreen() {
     } finally {
       setSending(false);
     }
-  }, [commentText, postId, userId, replyTo, router, queryClient]);
+  }, [commentText, postId, userId, guestId, replyTo, sending, queryClient]);
 
   const handleReply = useCallback((parentId: string) => {
-    if (!userId) {
-      router.push("/auth/login");
+    if (!userId && (!guestId || guestId.length === 0)) {
+      setShowLoginModal(true);
       return;
     }
     setReplyTo(parentId);
-  }, [userId, router]);
+    inputRef.current?.focus();
+  }, [userId, guestId]);
 
   const handleDeleteComment = useCallback(
     async (commentId: string) => {
-      if (!userId) return;
+      if (!userId && (!guestId || guestId.length === 0)) return;
       Alert.alert("Delete comment?", "This cannot be undone.", [
         { text: "Cancel", style: "cancel" },
         {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
+            // Optimistic: remove from local cache immediately
+            queryClient.setQueriesData<CommentItem[]>(
+              { queryKey: ["comments", postId] },
+              (old) => (old ? old.filter((c) => c.id !== commentId) : old),
+            );
             try {
-              await deleteComment(commentId, userId);
+              await deleteComment(commentId, userId, guestId);
               queryClient.invalidateQueries({ queryKey: ["comments", postId] });
+              queryClient.invalidateQueries({ queryKey: ["post", postId] });
             } catch (e) {
               console.log("[comment] delete failed", e);
               Alert.alert("Error", "Could not delete comment.");
+              // Revert optimistic on failure
+              queryClient.invalidateQueries({ queryKey: ["comments", postId] });
             }
           },
         },
       ]);
     },
-    [userId, postId, queryClient],
+    [userId, guestId, postId, queryClient],
   );
 
   const handleShare = useCallback(() => {
     Share.share({ message: `${post?.title ?? "Check this out!"} — see it on TryIt!` }).catch(() => {});
   }, [post?.title]);
+
+  // Focus the comment input when navigated with focusComment=true
+  useEffect(() => {
+    if (shouldFocusComment && post) {
+      const timer = setTimeout(() => inputRef.current?.focus(), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldFocusComment, post]);
 
   const isOwner = userId !== null && post?.user_id === userId;
 
@@ -575,6 +597,7 @@ export default function PostDetailScreen() {
             <CommentThread
               nodes={commentTree}
               currentUserId={userId}
+              currentGuestId={guestId}
               onReply={handleReply}
               onDelete={handleDeleteComment}
             />
@@ -597,15 +620,18 @@ export default function PostDetailScreen() {
       {/* Comment input */}
       <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
         <TextInput
+          ref={inputRef}
           testID="comment-input"
           style={styles.input}
-          placeholder={userId ? (replyTo ? "Write a reply..." : "Add a comment...") : "Log in to comment"}
+          placeholder={replyTo ? "Write a reply..." : "Add a comment..."}
           placeholderTextColor={Colors.inactiveIcon}
           value={commentText}
           onChangeText={setCommentText}
-          editable={userId !== null}
+          maxLength={500}
           onFocus={() => {
-            if (!userId) router.push("/auth/login");
+            if (!userId && (!guestId || guestId.length === 0)) {
+              setShowLoginModal(true);
+            }
           }}
         />
         <TouchableOpacity
@@ -618,6 +644,40 @@ export default function PostDetailScreen() {
         </TouchableOpacity>
       </View>
       </KeyboardAvoidingView>
+
+      {/* Login prompt for guests */}
+      <Modal
+        visible={showLoginModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLoginModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setShowLoginModal(false)}
+        >
+          <View style={styles.loginSheet}>
+            <Text style={styles.loginTitle}>Please sign in to comment</Text>
+            <Text style={styles.loginSubtitle}>Join TryIt to share your thoughts and interact with others.</Text>
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={() => {
+                setShowLoginModal(false);
+                router.push("/auth/login");
+              }}
+            >
+              <Text style={styles.loginButtonText}>Log In / Sign Up</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuItem, styles.menuItemLast]}
+              onPress={() => setShowLoginModal(false)}
+            >
+              <Text style={[styles.menuItemText, { color: Colors.mutedText }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Post menu modal */}
       <Modal
@@ -973,6 +1033,44 @@ const styles = StyleSheet.create({
   sendText: {
     color: "#FFFFFF",
     fontSize: 14,
+    fontWeight: "800" as const,
+  },
+  loginSheet: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    marginHorizontal: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  loginTitle: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: "800" as const,
+    textAlign: "center",
+    paddingTop: 24,
+    paddingHorizontal: 20,
+  },
+  loginSubtitle: {
+    color: Colors.mutedText,
+    fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 20,
+    lineHeight: 20,
+  },
+  loginButton: {
+    backgroundColor: Colors.flameOrange,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  loginButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
     fontWeight: "800" as const,
   },
 });

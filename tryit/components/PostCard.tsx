@@ -233,6 +233,10 @@ export default function PostCard({
     router.push({ pathname: "/post/[id]", params: { id: post.id } });
   }, [router, post.id]);
 
+  const openDetailWithComments = useCallback(() => {
+    router.push({ pathname: "/post/[id]", params: { id: post.id, focusComment: "true" } });
+  }, [router, post.id]);
+
   return (
     <View style={styles.card} testID={`post-card-${post.id}`}>
       {/* Header */}
@@ -375,7 +379,7 @@ export default function PostCard({
           </Text>
         </TouchableOpacity>
         <View style={styles.iconActions}>
-          <TouchableOpacity style={styles.iconButton} onPress={openDetail}>
+          <TouchableOpacity style={styles.iconButton} onPress={openDetailWithComments} testID={`comment-button-${post.id}`}>
             <MessageCircle size={21} color={Colors.mutedText} />
             <Text style={styles.iconCount}>{formatCount(post.comment_count)}</Text>
           </TouchableOpacity>

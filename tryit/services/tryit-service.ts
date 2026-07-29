@@ -574,41 +574,110 @@ export async function getComments(postId: string): Promise<CommentItem[]> {
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
   if (rows.length === 0) return [];
-  const userIds = Array.from(new Set(rows.map((r) => String(r.user_id))));
-  const { data: profiles } = await supabase
-    .from("user_profiles")
-    .select("id, username, display_name, avatar_url, is_verified")
-    .in("id", userIds);
-  const profileMap = new Map<string, Record<string, unknown>>();
-  (profiles ?? []).forEach((p: Record<string, unknown>) => profileMap.set(String(p.id), p));
-  return rows.map((r) => ({
-    id: String(r.id),
-    post_id: String(r.post_id),
-    user_id: String(r.user_id),
-    parent_id: r.parent_id ? String(r.parent_id) : null,
-    content: String(r.content ?? ""),
-    created_at: String(r.created_at ?? ""),
-    author: mapAuthor(profileMap.get(String(r.user_id))),
-  }));
+  // Fetch profiles only for comments that have a user_id (guest comments have no profile).
+  const userIds = Array.from(new Set(
+    rows.filter((r) => r.user_id).map((r) => String(r.user_id)),
+  ));
+  let profileMap = new Map<string, Record<string, unknown>>();
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("user_profiles")
+      .select("id, username, display_name, avatar_url, is_verified")
+      .in("id", userIds);
+    (profiles ?? []).forEach((p: Record<string, unknown>) => profileMap.set(String(p.id), p));
+  }
+  return rows.map((r) => {
+    const uid = r.user_id ? String(r.user_id) : null;
+    const author = uid ? mapAuthor(profileMap.get(uid)) : null;
+    return {
+      id: String(r.id),
+      post_id: String(r.post_id),
+      user_id: uid ?? "",
+      guest_id: r.guest_id ? String(r.guest_id) : null,
+      parent_id: r.parent_id ? String(r.parent_id) : null,
+      content: String(r.content ?? ""),
+      created_at: String(r.created_at ?? ""),
+      author,
+    };
+  });
 }
 
-export async function addComment(postId: string, userId: string, content: string): Promise<void> {
-  const { error } = await supabase.from("comments").insert({ post_id: postId, user_id: userId, content });
-  if (error) throw error;
+/** Add a comment. Authenticated users pass userId; guests pass guestId. */
+export async function addComment(
+  postId: string,
+  content: string,
+  userId: string | null,
+  guestId: string,
+): Promise<void> {
+  const trimmed = content.trim();
+  if (trimmed.length === 0) throw new Error("Comment cannot be empty.");
+  if (trimmed.length > 500) throw new Error("Comment is too long (max 500 characters).");
+  const row: Record<string, unknown> = {
+    post_id: postId,
+    content: trimmed,
+  };
+  if (userId) {
+    row.user_id = userId;
+    row.guest_id = null;
+  } else {
+    row.guest_id = guestId;
+    row.user_id = null;
+  }
+  const { error } = await supabase.from("comments").insert(row);
+  if (error) {
+    console.log("[addComment] insert error", postId, error.message);
+    throw error;
+  }
 }
 
-/** Reply to a comment (sets parent_id). Uses the same comments table — no schema change. */
-export async function addReply(postId: string, parentId: string, userId: string, content: string): Promise<void> {
-  const { error } = await supabase
-    .from("comments")
-    .insert({ post_id: postId, parent_id: parentId, user_id: userId, content });
-  if (error) throw error;
+/** Reply to a comment (sets parent_id). Authenticated users pass userId; guests pass guestId. */
+export async function addReply(
+  postId: string,
+  parentId: string,
+  content: string,
+  userId: string | null,
+  guestId: string,
+): Promise<void> {
+  const trimmed = content.trim();
+  if (trimmed.length === 0) throw new Error("Reply cannot be empty.");
+  if (trimmed.length > 500) throw new Error("Reply is too long (max 500 characters).");
+  const row: Record<string, unknown> = {
+    post_id: postId,
+    parent_id: parentId,
+    content: trimmed,
+  };
+  if (userId) {
+    row.user_id = userId;
+    row.guest_id = null;
+  } else {
+    row.guest_id = guestId;
+    row.user_id = null;
+  }
+  const { error } = await supabase.from("comments").insert(row);
+  if (error) {
+    console.log("[addReply] insert error", postId, error.message);
+    throw error;
+  }
 }
 
-/** Delete a comment — RLS ensures only the owner can delete. */
-export async function deleteComment(commentId: string, userId: string): Promise<void> {
-  const { error } = await supabase.from("comments").delete().eq("id", commentId).eq("user_id", userId);
-  if (error) throw error;
+/** Delete a comment. Authenticated users match by user_id; guests match by guest_id.
+ *  RLS policies enforce ownership on the server side as well. */
+export async function deleteComment(
+  commentId: string,
+  userId: string | null,
+  guestId: string,
+): Promise<void> {
+  let query = supabase.from("comments").delete().eq("id", commentId);
+  if (userId) {
+    query = query.eq("user_id", userId);
+  } else {
+    query = query.eq("guest_id", guestId).is("user_id", null);
+  }
+  const { error } = await query;
+  if (error) {
+    console.log("[deleteComment] error", commentId, error.message);
+    throw error;
+  }
 }
 
 // ─── Follows ──────────────────────────────────────────────────────────────

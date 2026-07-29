@@ -54,6 +54,7 @@ export interface CommentItem {
   id: string;
   post_id: string;
   user_id: string;
+  guest_id: string | null;
   parent_id: string | null;
   content: string;
   created_at: string;
