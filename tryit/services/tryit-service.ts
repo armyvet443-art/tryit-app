@@ -563,6 +563,38 @@ export async function getPostsByCategory(category: string): Promise<TryPost[]> {
   return attachAuthors((data ?? []) as Record<string, unknown>[]);
 }
 
+/** A category with its post count, for the Explore filter pills. */
+export interface CategoryWithCount {
+  name: string;
+  count: number;
+}
+
+/**
+ * Fetch the top categories by post count from the posts table.
+ * Returns up to `limit` categories sorted by usage descending.
+ */
+export async function fetchCategoriesWithCounts(limit: number = 30): Promise<CategoryWithCount[]> {
+  const { data, error } = await supabase
+    .from("posts")
+    .select("category")
+    .not("category", "is", null)
+    .neq("category", "");
+  if (error) {
+    console.log("[fetchCategoriesWithCounts] error", error.message);
+    return [];
+  }
+  const counts = new Map<string, number>();
+  for (const row of (data ?? []) as Record<string, unknown>[]) {
+    const cat = String(row.category ?? "").trim();
+    if (cat.length === 0) continue;
+    counts.set(cat, (counts.get(cat) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────
 
 export async function getNotifications(userId: string): Promise<NotificationItem[]> {

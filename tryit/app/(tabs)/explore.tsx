@@ -19,10 +19,12 @@ import Avatar from "@/components/Avatar";
 import EmptyState from "@/components/EmptyState";
 import Colors from "@/constants/colors";
 import {
+  fetchCategoriesWithCounts,
   fetchFeed,
   getPostsByCategory,
   searchPosts,
   searchUsers,
+  type CategoryWithCount,
 } from "@/services/tryit-service";
 import { CATEGORIES, type AuthorProfile, type TryPost } from "@/types/models";
 import { formatCount } from "@/utils/format";
@@ -44,6 +46,32 @@ export default function ExploreScreen() {
     queryFn: () => fetchFeed("trending", null, 0, 30),
     enabled: !searching && category === null,
   });
+
+  // Dynamic categories from the database — falls back to the static CATEGORIES list.
+  const categoriesQuery = useQuery<CategoryWithCount[]>({
+    queryKey: ["explore-categories"],
+    queryFn: () => fetchCategoriesWithCounts(30),
+    staleTime: 60_000,
+  });
+
+  const categoryList = useMemo<CategoryWithCount[]>(() => {
+    const dynamic = categoriesQuery.data ?? [];
+    if (dynamic.length >= 3) {
+      // Merge: ensure all dynamic categories are present, keep dynamic counts.
+      const map = new Map<string, number>();
+      for (const c of dynamic) map.set(c.name, c.count);
+      // Also include any static categories not in dynamic (count 0).
+      for (const s of CATEGORIES) {
+        if (!map.has(s)) map.set(s, 0);
+      }
+      return Array.from(map.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20);
+    }
+    // Fallback: static categories with count 0.
+    return CATEGORIES.map((name) => ({ name, count: 0 }));
+  }, [categoriesQuery.data]);
 
   const categoryQuery = useQuery<TryPost[]>({
     queryKey: ["explore-category", category],
@@ -158,15 +186,20 @@ export default function ExploreScreen() {
             style={[styles.categoryChip, category === null && styles.categoryChipActive]}
             onPress={() => setCategory(null)}
           >
-            <Text style={[styles.categoryText, category === null && styles.categoryTextActive]}>🔥 Trending</Text>
+            <Text style={[styles.categoryText, category === null && styles.categoryTextActive]}>
+              🔥 Trending
+            </Text>
           </TouchableOpacity>
-          {CATEGORIES.map((c) => (
+          {categoryList.map((c) => (
             <TouchableOpacity
-              key={c}
-              style={[styles.categoryChip, category === c && styles.categoryChipActive]}
-              onPress={() => setCategory(c)}
+              key={c.name}
+              style={[styles.categoryChip, category === c.name && styles.categoryChipActive]}
+              onPress={() => setCategory(c.name)}
             >
-              <Text style={[styles.categoryText, category === c && styles.categoryTextActive]}>{c}</Text>
+              <Text style={[styles.categoryText, category === c.name && styles.categoryTextActive]}>
+                {c.name}
+                {c.count > 0 ? `  ${formatCount(c.count)}` : ""}
+              </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -256,7 +289,7 @@ const styles = StyleSheet.create({
     color: Colors.flameOrange,
   },
   categoriesScroll: {
-    maxHeight: 54,
+    maxHeight: 60,
   },
   categoriesContent: {
     gap: 8,
