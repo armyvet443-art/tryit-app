@@ -121,6 +121,7 @@ export const CATEGORIES: string[] = [
   "Pets",
   "Cars",
   "Art",
+  "Acting",
   "Business",
   "Education",
   "Finance",
