@@ -120,6 +120,31 @@ export default function FeedScreen() {
     queryClient.invalidateQueries({ queryKey: ["myFires"] });
   }, [queryClient, feedType, userId]);
 
+  const handlePostDeleted = useCallback(
+    (deletedPostId: string) => {
+      // Optimistic: remove the post from the local cache immediately
+      queryClient.setQueriesData<TryPost[]>(
+        { queryKey: ["feed"] },
+        (old) => (old ? old.filter((p) => p.id !== deletedPostId) : old),
+      );
+      // Also remove from explore caches
+      queryClient.setQueriesData<TryPost[]>(
+        { queryKey: ["explore-trending"] },
+        (old) => (old ? old.filter((p) => p.id !== deletedPostId) : old),
+      );
+      queryClient.setQueriesData<TryPost[]>(
+        { queryKey: ["explore-category"] },
+        (old) => (old ? old.filter((p) => p.id !== deletedPostId) : old),
+      );
+      queryClient.setQueriesData<TryPost[]>(
+        { queryKey: ["userPosts"] },
+        (old) => (old ? old.filter((p) => p.id !== deletedPostId) : old),
+      );
+      queryClient.removeQueries({ queryKey: ["post", deletedPostId] });
+    },
+    [queryClient],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: TryPost }) => (
       <PostCard
@@ -131,9 +156,10 @@ export default function FeedScreen() {
         isFollowingAuthor={followingQuery.data?.has(item.user_id) ?? false}
         fired={myFiresQuery.data?.has(item.id) ?? false}
         fireCount={fireCountsQuery.data?.[item.id] ?? 0}
+        onDeleted={handlePostDeleted}
       />
     ),
-    [reactionsQuery.data, countsQuery.data, triedQuery.data, savedQuery.data, followingQuery.data, myFiresQuery.data, fireCountsQuery.data],
+    [reactionsQuery.data, countsQuery.data, triedQuery.data, savedQuery.data, followingQuery.data, myFiresQuery.data, fireCountsQuery.data, handlePostDeleted],
   );
 
   return (

@@ -951,6 +951,59 @@ export async function createPost(input: {
   if (error) throw error;
 }
 
+// ─── Edit / Delete Post ───────────────────────────────────────────────────
+
+/** Extract the storage object path from a public media URL.
+ *  e.g. https://xyz.supabase.co/storage/v1/object/public/post-media/userid/123.mp4
+ *  → "userid/123.mp4"
+ */
+function extractStoragePath(publicUrl: string, bucket: string): string | null {
+  const marker = `/object/public/${bucket}/`;
+  const idx = publicUrl.indexOf(marker);
+  if (idx === -1) return null;
+  return publicUrl.slice(idx + marker.length);
+}
+
+/** Delete a post and all related data (reactions, likes, comments, storage file).
+ *  Optimised for the common case — uses parallel deletes where possible. */
+export async function deletePost(postId: string, mediaUrl: string): Promise<void> {
+  // 1. Delete related rows in parallel
+ const [r1, r2, r3] = await Promise.allSettled([
+    supabase.from("reactions").delete().eq("post_id", postId),
+    supabase.from("post_likes").delete().eq("post_id", postId),
+    supabase.from("comments").delete().eq("post_id", postId),
+  ]);
+  // Log but don't throw — the post row deletion is the critical part.
+  for (const r of [r1, r2, r3]) {
+    if (r.status === "rejected") console.log("[deletePost] related cleanup failed", r.reason);
+  }
+
+  // 2. Delete the post row
+  const { error: postError } = await supabase.from("posts").delete().eq("id", postId);
+  if (postError) throw postError;
+
+  // 3. Delete the media file from storage (best-effort)
+  if (mediaUrl && mediaUrl.length > 0) {
+    const path = extractStoragePath(mediaUrl, "post-media");
+    if (path) {
+      const { error: storageError } = await supabase.storage.from("post-media").remove([path]);
+      if (storageError) console.log("[deletePost] storage cleanup failed", storageError.message);
+    }
+  }
+}
+
+/** Update a post's caption and/or category. */
+export async function updatePost(
+  postId: string,
+  updates: { caption?: string; category?: string },
+): Promise<void> {
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (updates.caption !== undefined) patch.caption = updates.caption;
+  if (updates.category !== undefined) patch.category = updates.category;
+  const { error } = await supabase.from("posts").update(patch).eq("id", postId);
+  if (error) throw error;
+}
+
 // ─── Account ──────────────────────────────────────────────────────────────
 
 export async function deleteAccount(userId: string): Promise<void> {

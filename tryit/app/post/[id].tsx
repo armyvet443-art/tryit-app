@@ -1,13 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, Bookmark, Share2 } from "lucide-react-native";
+import { ArrowLeft, Bookmark, Flag, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   Share,
@@ -31,6 +32,7 @@ import {
   addComment,
   addReply,
   deleteComment,
+  deletePost,
   fetchPost,
   getComments,
   getFollowingIds,
@@ -78,6 +80,8 @@ export default function PostDetailScreen() {
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [isFired, setIsFired] = useState<boolean>(false);
   const [fireCount, setFireCount] = useState<number>(0);
+  const [menuVisible, setMenuVisible] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const fireScale = React.useRef(new Animated.Value(1)).current;
 
   const postQuery = useQuery<TryPost | null>({
@@ -350,6 +354,50 @@ export default function PostDetailScreen() {
     Share.share({ message: `${post?.title ?? "Check this out!"} — see it on TryIt!` }).catch(() => {});
   }, [post?.title]);
 
+  const isOwner = userId !== null && post?.user_id === userId;
+
+  const handleEdit = useCallback(() => {
+    setMenuVisible(false);
+    if (postId.length > 0) router.push({ pathname: "/edit/[id]", params: { id: postId } });
+  }, [router, postId]);
+
+  const handleDelete = useCallback(() => {
+    setMenuVisible(false);
+    Alert.alert(
+      "Delete this post?",
+      "This can't be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            if (isDeleting || !post) return;
+            setIsDeleting(true);
+            try {
+              await deletePost(postId, post.media_url);
+              queryClient.invalidateQueries({ queryKey: ["feed"] });
+              queryClient.invalidateQueries({ queryKey: ["userPosts"] });
+              queryClient.removeQueries({ queryKey: ["post", postId] });
+              Alert.alert("Post deleted", "Your post has been removed.");
+              router.back();
+            } catch (e) {
+              console.log("[deletePost] failed", e);
+              Alert.alert("Error", "Could not delete the post. Please try again.");
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [isDeleting, post, postId, queryClient, router]);
+
+  const handleReport = useCallback(() => {
+    setMenuVisible(false);
+    Alert.alert("Report", "Reporting is coming soon. Thanks for helping keep TryIt safe!");
+  }, []);
+
   const openAuthor = useCallback(() => {
     if (post) router.push({ pathname: "/user/[id]", params: { id: post.user_id } });
   }, [router, post]);
@@ -373,6 +421,7 @@ export default function PostDetailScreen() {
   const replyTarget = replyTo ? (commentsQuery.data ?? []).find((c) => c.id === replyTo) : null;
 
   return (
+    <>
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -405,6 +454,14 @@ export default function PostDetailScreen() {
           {post.author && post.user_id !== userId ? (
             <FollowButton targetUserId={post.user_id} isFollowing={followingQuery.data?.has(post.user_id) ?? false} compact />
           ) : null}
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => setMenuVisible(true)}
+            testID={`post-detail-menu-${post.id}`}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <MoreHorizontal size={22} color={Colors.mutedText} />
+          </TouchableOpacity>
         </View>
 
         {/* Media carousel */}
@@ -560,7 +617,45 @@ export default function PostDetailScreen() {
           {sending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.sendText}>Send</Text>}
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+
+      {/* Post menu modal */}
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setMenuVisible(false)}
+        >
+          <View style={styles.menuSheet}>
+            {isOwner ? (
+              <>
+                <TouchableOpacity style={styles.menuItem} onPress={handleEdit} testID={`edit-post-detail-${post.id}`}>
+                  <Pencil size={20} color={Colors.text} />
+                  <Text style={styles.menuItemText}>Edit Post</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={handleDelete} testID={`delete-post-detail-${post.id}`} disabled={isDeleting}>
+                  <Trash2 size={20} color={Colors.error} />
+                  <Text style={[styles.menuItemText, { color: Colors.error }]}>Delete Post</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity style={styles.menuItem} onPress={handleReport} testID={`report-post-detail-${post.id}`}>
+                <Flag size={20} color={Colors.mutedText} />
+                <Text style={styles.menuItemText}>Report</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={[styles.menuItem, styles.menuItemLast]} onPress={() => setMenuVisible(false)}>
+              <Text style={[styles.menuItemText, { color: Colors.mutedText }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
   );
 }
 
@@ -585,6 +680,42 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     padding: 4,
+  },
+  menuButton: {
+    padding: 6,
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+    paddingBottom: 20,
+  },
+  menuSheet: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    marginHorizontal: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+    minHeight: 52,
+  },
+  menuItemLast: {
+    justifyContent: "center",
+    borderBottomWidth: 0,
+  },
+  menuItemText: {
+    color: Colors.text,
+    fontSize: 16,
+    fontWeight: "600" as const,
   },
   authorRow: {
     flexDirection: "row",

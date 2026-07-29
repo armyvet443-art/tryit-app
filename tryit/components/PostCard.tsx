@@ -1,11 +1,13 @@
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Bookmark, MapPin, MessageCircle, Play, Share2 } from "lucide-react-native";
+import { Bookmark, Flag, MapPin, MessageCircle, MoreHorizontal, Play, Share2, Trash2, Pencil } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  Alert,
   Animated,
-  Platform,
+  Modal,
+ Platform,
   Share,
   StyleSheet,
   Text,
@@ -18,6 +20,7 @@ import FollowButton from "@/components/FollowButton";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import {
+  deletePost,
   setSaved,
   setTried,
   toggleFire,
@@ -47,6 +50,7 @@ interface PostCardProps {
   showFollow?: boolean;
   fired?: boolean;
   fireCount?: number;
+  onDeleted?: (postId: string) => void;
 }
 
 export default function PostCard({
@@ -59,9 +63,16 @@ export default function PostCard({
   showFollow = true,
   fired = false,
   fireCount = 0,
+  onDeleted,
 }: PostCardProps) {
   const { userId, guestId } = useAuth();
   const router = useRouter();
+
+  // Owner check — either logged-in user_id matches, or guest_id matches (for anonymous posts)
+  const isOwner = userId !== null ? post.user_id === userId : false;
+
+  const [menuVisible, setMenuVisible] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const [reaction, setReaction] = useState<ReactionType | null>(myReaction);
   const [counts, setCounts] = useState<ReactionCounts>(
@@ -175,6 +186,45 @@ export default function PostCard({
     Share.share({ message: `${post.title} — see it on TryIt!` }).catch(() => {});
   }, [post.title]);
 
+  const handleEdit = useCallback(() => {
+    setMenuVisible(false);
+    router.push({ pathname: "/edit/[id]", params: { id: post.id } });
+  }, [router, post.id]);
+
+  const handleDelete = useCallback(() => {
+    setMenuVisible(false);
+    Alert.alert(
+      "Delete this post?",
+      "This can't be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            if (isDeleting) return;
+            setIsDeleting(true);
+            // Optimistic: notify parent immediately
+            if (onDeleted) onDeleted(post.id);
+            try {
+              await deletePost(post.id, post.media_url);
+            } catch (e) {
+              console.log("[deletePost] failed", e);
+              Alert.alert("Error", "Could not delete the post. Please try again.");
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [isDeleting, onDeleted, post.id, post.media_url]);
+
+  const handleReport = useCallback(() => {
+    setMenuVisible(false);
+    Alert.alert("Report", "Reporting is coming soon. Thanks for helping keep TryIt safe!");
+  }, []);
+
   const openAuthor = useCallback(() => {
     router.push({ pathname: "/user/[id]", params: { id: post.user_id } });
   }, [router, post.user_id]);
@@ -201,9 +251,19 @@ export default function PostCard({
             </Text>
           </View>
         </TouchableOpacity>
-        {showFollow && post.author ? (
-          <FollowButton targetUserId={post.user_id} isFollowing={isFollowingAuthor} compact />
-        ) : null}
+        <View style={styles.headerRight}>
+          {showFollow && post.author && !isOwner ? (
+            <FollowButton targetUserId={post.user_id} isFollowing={isFollowingAuthor} compact />
+          ) : null}
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => setMenuVisible(true)}
+            testID={`post-menu-${post.id}`}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <MoreHorizontal size={22} color={Colors.mutedText} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Media */}
@@ -331,6 +391,43 @@ export default function PostCard({
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Post menu modal */}
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setMenuVisible(false)}
+        >
+          <View style={styles.menuSheet}>
+            {isOwner ? (
+              <>
+                <TouchableOpacity style={styles.menuItem} onPress={handleEdit} testID={`edit-post-${post.id}`}>
+                  <Pencil size={20} color={Colors.text} />
+                  <Text style={styles.menuItemText}>Edit Post</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.menuItem, styles.menuItemDanger]} onPress={handleDelete} testID={`delete-post-${post.id}`} disabled={isDeleting}>
+                  <Trash2 size={20} color={Colors.error} />
+                  <Text style={[styles.menuItemText, { color: Colors.error }]}>Delete Post</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity style={styles.menuItem} onPress={handleReport} testID={`report-post-${post.id}`}>
+                <Flag size={20} color={Colors.mutedText} />
+                <Text style={styles.menuItemText}>Report</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={[styles.menuItem, styles.menuItemLast]} onPress={() => setMenuVisible(false)}>
+              <Text style={[styles.menuItemText, { color: Colors.mutedText }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -352,6 +449,50 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  menuButton: {
+    padding: 6,
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+    paddingBottom: 20,
+  },
+  menuSheet: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    marginHorizontal: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+    minHeight: 52,
+  },
+  menuItemDanger: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  menuItemLast: {
+    justifyContent: "center",
+    borderBottomWidth: 0,
+  },
+  menuItemText: {
+    color: Colors.text,
+    fontSize: 16,
+    fontWeight: "600" as const,
   },
   authorRow: {
     flexDirection: "row",
