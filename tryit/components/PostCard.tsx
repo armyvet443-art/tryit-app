@@ -108,7 +108,8 @@ export default function PostCard({
         const freshCounts = await upsertReaction(post.id, nextReaction, userId, guestId);
         setCounts(freshCounts);
       } catch (e) {
-        console.log("[reaction] upsert failed", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        console.log("[reaction] upsert failed", { postId: post.id, reaction: nextReaction, userId, guestId, error: msg });
         setReaction(previous);
         setCounts(counts);
       }
@@ -163,7 +164,8 @@ export default function PostCard({
       const freshCount = await toggleFire(post.id, userId, guestId);
       setFireCountState(freshCount);
     } catch (e) {
-      console.log("[fire] toggle failed", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.log("[fire] toggle failed", { postId: post.id, userId, guestId, error: msg });
       setIsFired(!next);
       setFireCountState((c) => Math.max(0, c + (next ? -1 : 1)));
     }
