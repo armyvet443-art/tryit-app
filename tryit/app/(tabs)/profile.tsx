@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { Grid3x3, Settings, User } from "lucide-react-native";
+import { Bookmark, Grid3x3, Settings, User } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -19,7 +19,7 @@ import Avatar from "@/components/Avatar";
 import EmptyState from "@/components/EmptyState";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
-import { getTriedPosts, getUserPosts } from "@/services/tryit-service";
+import { getBookmarkedPosts, getTriedPosts, getUserPosts } from "@/services/tryit-service";
 import type { TryPost } from "@/types/models";
 import { formatCount } from "@/utils/format";
 
@@ -42,6 +42,12 @@ export default function ProfileScreen() {
   const triedQuery = useQuery<TryPost[]>({
     queryKey: ["triedPosts", userId],
     queryFn: () => getTriedPosts(userId as string),
+    enabled: userId !== null,
+  });
+
+  const bookmarksQuery = useQuery<TryPost[]>({
+    queryKey: ["bookmarkedPosts", userId],
+    queryFn: () => getBookmarkedPosts(userId as string),
     enabled: userId !== null,
   });
 
@@ -121,6 +127,23 @@ export default function ProfileScreen() {
           <View style={styles.stat}>
             <Text style={styles.statValue}>{formatCount(profile.total_tries)}</Text>
             <Text style={styles.statLabel}>Tries</Text>
+          </View>
+        </View>
+
+        {/* Try Later / Tried quick actions */}
+        <View style={styles.quickActionsRow}>
+          <TouchableOpacity
+            style={styles.quickActionBtn}
+            onPress={() => router.push("/try-later")}
+            testID="try-later-button"
+          >
+            <Bookmark size={18} color={Colors.flameOrange} />
+            <Text style={styles.quickActionText}>Try Later ({formatCount(bookmarksQuery.data?.length ?? 0)})</Text>
+          </TouchableOpacity>
+          <View style={styles.quickActionDivider} />
+          <View style={styles.quickActionBtn}>
+            <Text style={styles.quickActionEmoji}>🔥</Text>
+            <Text style={styles.quickActionText}>Tried ({formatCount(triedQuery.data?.length ?? 0)})</Text>
           </View>
         </View>
 
@@ -297,6 +320,36 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 16,
     paddingHorizontal: 8,
+  },
+  quickActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 16,
+    paddingVertical: 12,
+    marginTop: 14,
+  },
+  quickActionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
+  quickActionDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: Colors.border,
+  },
+  quickActionText: {
+    color: Colors.text,
+    fontSize: 13,
+    fontWeight: "700" as const,
+  },
+  quickActionEmoji: {
+    fontSize: 16,
   },
   stat: {
     alignItems: "center",

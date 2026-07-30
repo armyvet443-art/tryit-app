@@ -41,6 +41,7 @@ function RootLayoutNav() {
       <Stack.Screen name="messages/[id]" options={{ title: "Chat" }} />
       <Stack.Screen name="settings" options={{ title: "Settings" }} />
       <Stack.Screen name="edit-profile" options={{ title: "Edit Profile" }} />
+      <Stack.Screen name="try-later" options={{ title: "Try Later" }} />
     </Stack>
   );
 }

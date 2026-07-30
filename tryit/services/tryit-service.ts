@@ -890,6 +890,30 @@ export async function getUserPosts(userId: string): Promise<TryPost[]> {
   return attachAuthors((data ?? []) as Record<string, unknown>[]);
 }
 
+/** Posts the user has bookmarked (Try Later queue) — joins saved_posts with posts. */
+export async function getBookmarkedPosts(userId: string): Promise<TryPost[]> {
+  const { data: savedRows, error: savedError } = await supabase
+    .from("saved_posts")
+    .select("post_id, created_at")
+    .eq("user_id", userId);
+  if (savedError) throw savedError;
+  const saved = (savedRows ?? []) as Record<string, unknown>[];
+  const postIds = saved.map((r) => String(r.post_id));
+  if (postIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .in("id", postIds);
+  if (error) throw error;
+  const posts = await attachAuthors((data ?? []) as Record<string, unknown>[]);
+  // Re-sort by the saved_posts.created_at DESC (most recently saved first).
+  const savedOrder = new Map(saved.map((r) => [String(r.post_id), String(r.created_at ?? "")]));
+  return posts
+    .map((p) => ({ ...p, _savedAt: savedOrder.get(p.id) ?? "" }))
+    .sort((a, b) => (a._savedAt < b._savedAt ? 1 : -1))
+    .map(({ _savedAt, ...rest }) => rest as TryPost);
+}
+
 /** Posts the user has marked as Tried — joins tried_this with posts. */
 export async function getTriedPosts(userId: string): Promise<TryPost[]> {
   const { data: triedRows, error: triedError } = await supabase
