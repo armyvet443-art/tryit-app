@@ -372,9 +372,31 @@ export default function PostDetailScreen() {
     [userId, guestId, postId, queryClient],
   );
 
-  const handleShare = useCallback(() => {
-    Share.share({ message: `${post?.title ?? "Check this out!"} — see it on TryIt!` }).catch(() => {});
-  }, [post?.title]);
+  const [isSharePressed, setIsSharePressed] = useState(false);
+
+  const handleShare = useCallback(async () => {
+    if (!post) return;
+    const link = `https://tryit-rn-migration.rork.app/post/${post.id}`;
+    try {
+      if (Share.share) {
+        const result = await Share.share({
+          message: `Check this try on TryIt: ${link}`,
+          url: link,
+        });
+        if (result.action === Share.sharedAction) return;
+      }
+    } catch {}
+    try {
+      if (typeof navigator !== "undefined" && navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+        Alert.alert("Link copied!", `Share it: ${link}`);
+      } else {
+        Alert.alert("Share", link);
+      }
+    } catch {
+      Alert.alert("Share", link);
+    }
+  }, [post]);
 
   // Focus the comment input when navigated with focusComment=true
   useEffect(() => {
@@ -643,7 +665,14 @@ export default function PostDetailScreen() {
                 fill={isSaved ? Colors.flameOrange : "transparent"}
               />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={handleShare} testID={`share-button-${post.id}`}>
+            <TouchableOpacity
+              style={[styles.iconButton, { opacity: isSharePressed ? 0.7 : 1 }]}
+              onPress={handleShare}
+              onPressIn={() => setIsSharePressed(true)}
+              onPressOut={() => setIsSharePressed(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              testID={`share-button-${post.id}`}
+            >
               <Share2 size={21} color={Colors.mutedText} />
             </TouchableOpacity>
           </View>

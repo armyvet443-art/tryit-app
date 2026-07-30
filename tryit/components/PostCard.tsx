@@ -194,9 +194,30 @@ export default function PostCard({
     }
   }, [isFired, fireScale, post.id, userId, guestId]);
 
-  const handleShare = useCallback(() => {
-    Share.share({ message: `${post.title} — see it on TryIt!` }).catch(() => {});
-  }, [post.title]);
+  const [isSharePressed, setIsSharePressed] = useState(false);
+
+  const handleShare = useCallback(async () => {
+    const link = `https://tryit-rn-migration.rork.app/post/${post.id}`;
+    try {
+      if (Share.share) {
+        const result = await Share.share({
+          message: `Check this try on TryIt: ${link}`,
+          url: link,
+ });
+        if (result.action === Share.sharedAction) return;
+      }
+    } catch {}
+    try {
+      if (typeof navigator !== "undefined" && navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+        Alert.alert("Link copied!", `Share it: ${link}`);
+      } else {
+        Alert.alert("Share", link);
+      }
+    } catch {
+      Alert.alert("Share", link);
+    }
+  }, [post.id]);
 
   const handleEdit = useCallback(() => {
     setMenuVisible(false);
@@ -460,7 +481,13 @@ export default function PostCard({
               fill={isSaved ? Colors.flameOrange : "transparent"}
             />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
+          <TouchableOpacity
+            style={[styles.iconButton, { opacity: isSharePressed ? 0.7 : 1 }]}
+            onPress={handleShare}
+            onPressIn={() => setIsSharePressed(true)}
+            onPressOut={() => setIsSharePressed(false)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <Share2 size={21} color={Colors.mutedText} />
           </TouchableOpacity>
         </View>
