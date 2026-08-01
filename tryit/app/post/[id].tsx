@@ -721,7 +721,7 @@ export default function PostDetailScreen() {
           placeholderTextColor={Colors.inactiveIcon}
           value={commentText}
           onChangeText={setCommentText}
-          maxLength={500}
+          maxLength={280}
           onFocus={() => {
             if (!userId && (!guestId || guestId.length === 0)) {
               setShowLoginModal(true);
@@ -737,6 +737,9 @@ export default function PostDetailScreen() {
           {sending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.sendText}>Send</Text>}
         </TouchableOpacity>
       </View>
+      <Text style={[styles.charCounter, 280 - commentText.length <= 20 && styles.charCounterLow]}>
+        {280 - commentText.length} characters left
+      </Text>
       </KeyboardAvoidingView>
 
       {/* Login prompt for guests */}
@@ -1216,6 +1219,16 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "800" as const,
+  },
+  charCounter: {
+    color: Colors.mutedText,
+    fontSize: 11,
+    textAlign: "right",
+    paddingRight: 16,
+    paddingBottom: 6,
+  },
+  charCounterLow: {
+    color: Colors.error,
   },
   loginSheet: {
     backgroundColor: Colors.card,
