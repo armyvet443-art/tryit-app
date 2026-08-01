@@ -1204,13 +1204,23 @@ export async function createPost(input: {
   mediaType: "image" | "video";
   category: string;
   location: string;
+  /** Optional: multiple media items (photo + video collage). When provided,
+   *  media_url is stored as a JSON array that parseMediaItems() can parse. */
+  mediaItems?: { url: string; type: "image" | "video" }[];
 }): Promise<void> {
+  const hasMulti = input.mediaItems && input.mediaItems.length > 0;
+  const mediaUrlValue = hasMulti
+    ? JSON.stringify(input.mediaItems)
+    : input.mediaUrl;
+  const mediaTypeValue = hasMulti
+    ? input.mediaItems![0].type
+    : input.mediaType;
   const { error } = await supabase.from("posts").insert({
     user_id: input.userId,
     title: input.title,
     caption: input.caption,
-    media_url: input.mediaUrl,
-    media_type: input.mediaType,
+    media_url: mediaUrlValue,
+    media_type: mediaTypeValue,
     category: input.category,
     location: input.location,
   });

@@ -1,8 +1,8 @@
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Bookmark, Flag, MapPin, MessageCircle, MoreHorizontal, Play, Share2, ShieldOff, Trash2, Pencil } from "lucide-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import { Bookmark, Flag, Image as ImageIcon2, MapPin, MessageCircle, MoreHorizontal, Play, Share2, ShieldOff, Trash2, Pencil, Video as VideoIcon } from "lucide-react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -32,7 +32,7 @@ import {
   upsertReaction,
 } from "@/services/tryit-service";
 import { REACTION_META, ReactionType, TryPost } from "@/types/models";
-import { formatCount, timeAgo } from "@/utils/format";
+import { formatCount, parseMediaItems, timeAgo } from "@/utils/format";
 
 type ReactionCounts = Record<ReactionType, number>;
 
@@ -115,6 +115,8 @@ export default function PostCard({
   }, [reactionCounts]);
 
   const totalVotes = REACTION_ORDER.reduce((sum, key) => sum + counts[key], 0);
+
+  const mediaItems = useMemo(() => parseMediaItems(post), [post]);
 
   const handleReact = useCallback(
     async (type: ReactionType) => {
@@ -361,8 +363,45 @@ export default function PostCard({
         </View>
       </View>
 
-      {/* Media */}
-      {post.media_url ? (
+      {/* Media — collage if multiple items, single image otherwise */}
+      {mediaItems.length > 1 ? (
+        <View style={styles.collageRow}>
+          {mediaItems.map((item, i) => (
+            <TouchableOpacity
+              key={item.url + i}
+              activeOpacity={0.9}
+              onPress={openDetail}
+              style={styles.collageSlot}
+            >
+              <Image
+                source={{ uri: item.thumbnail ?? item.url }}
+                style={styles.collageMedia}
+                contentFit="cover"
+                transition={200}
+              />
+              {item.type === "video" ? (
+                <View style={styles.playOverlaySmall}>
+                  <View style={styles.playCircleSmall}>
+                    <Play size={18} color="#FFFFFF" fill="#FFFFFF" />
+                  </View>
+                </View>
+              ) : null}
+              <View style={styles.collageBadge}>
+                {item.type === "video" ? (
+                  <VideoIcon size={10} color="#FFFFFF" />
+                ) : (
+                  <ImageIcon2 size={10} color="#FFFFFF" />
+                )}
+              </View>
+            </TouchableOpacity>
+          ))}
+          {post.category ? (
+            <View style={styles.categoryChip}>
+              <Text style={styles.categoryText}>{post.category}</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : post.media_url ? (
         <TouchableOpacity activeOpacity={0.9} onPress={openDetail}>
           <Image
             source={{ uri: post.thumbnail_url ?? post.media_url }}
@@ -718,6 +757,52 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 340,
     backgroundColor: Colors.surfaceVariant,
+  },
+  collageRow: {
+    flexDirection: "row",
+    gap: 2,
+    height: 280,
+    backgroundColor: Colors.surfaceVariant,
+    position: "relative",
+  },
+  collageSlot: {
+    flex: 1,
+    position: "relative",
+  },
+  collageMedia: {
+    width: "100%",
+    height: 280,
+    backgroundColor: Colors.surfaceVariant,
+  },
+  playOverlaySmall: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playCircleSmall: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(15,15,15,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  collageBadge: {
+    position: "absolute",
+    bottom: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(15,15,15,0.8)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   playOverlay: {
     position: "absolute",

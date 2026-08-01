@@ -3,8 +3,8 @@ import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import * as FileSystem from "expo-file-system";
 import { useRouter } from "expo-router";
-import { Camera, ImagePlus, Video as VideoIcon } from "lucide-react-native";
-import React, { useCallback, useState } from "react";
+import { Camera, ImageIcon, ImagePlus, Video as VideoIcon, X } from "lucide-react-native";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -34,82 +34,93 @@ export default function CreateScreen() {
   const [caption, setCaption] = useState<string>("");
   const [category, setCategory] = useState<string>("");
   const [location, setLocation] = useState<string>("");
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [imageExt, setImageExt] = useState<string>("jpg");
-  const [isVideo, setIsVideo] = useState<boolean>(false);
+
+  // Primary media (photo) — slot 1
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoExt, setPhotoExt] = useState<string>("jpg");
+  const [photoLoadFailed, setPhotoLoadFailed] = useState<boolean>(false);
+
+  // Secondary media (video) — slot 2
+  const [videoUri, setVideoUri] = useState<string | null>(null);
+  const [videoExt, setVideoExt] = useState<string>("mp4");
+
   const [posting, setPosting] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
-  const [mediaLoadFailed, setMediaLoadFailed] = useState<boolean>(false);
   const [showCustomInput, setShowCustomInput] = useState<boolean>(false);
   const [customCategory, setCustomCategory] = useState<string>("");
 
   const MAX_VIDEO_BYTES = 100 * 1024 * 1024; // 100MB hard cap (matches bucket limit)
   const SOFT_LIMIT_BYTES = 50 * 1024 * 1024; // warn above this
 
-  const pickImage = async () => {
+  const hasPhoto = photoUri !== null && photoBase64 !== null;
+  const hasVideo = videoUri !== null;
+  const hasAnyMedia = hasPhoto || hasVideo;
+  const hasBoth = hasPhoto && hasVideo;
+
+  const pickPhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images", "videos"],
+      mediaTypes: ["images"],
       quality: 0.7,
       base64: true,
       allowsEditing: true,
       aspect: [4, 3],
-      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Low,
-      videoExportPreset: ImagePicker.VideoExportPreset.LowQuality,
     });
-    console.log("[pickImage] result:", { canceled: result.canceled, assets: result.assets?.map(a => ({ uri: a.uri, type: a.type, mimeType: a.mimeType })) });
     if (!result.canceled && result.assets.length > 0) {
       const asset = result.assets[0];
-      const assetIsVideo =
-        asset.type === "video" ||
-        asset.mimeType?.startsWith("video/") === true ||
-        /\.(mp4|mov|webm)$/i.test(asset.uri);
-      console.log("[pickImage] asset picked:", { uri: asset.uri, isVideo: assetIsVideo, mimeType: asset.mimeType, type: asset.type });
-
-      if (assetIsVideo) {
-        // Enforce the bucket size limit BEFORE upload so we can give a clear
-        // message instead of a generic "exceeded maximum size" from storage.
-        try {
-          const info = await FileSystem.getInfoAsync(asset.uri);
-          const sizeBytes = info.exists && !info.isDirectory ? info.size : 0;
-          console.log("[pickImage] video size bytes:", sizeBytes);
-          if (sizeBytes > MAX_VIDEO_BYTES) {
-            Alert.alert(
-              "Video too large",
-              `That video is ${(sizeBytes / 1024 / 1024).toFixed(1)}MB. The max is 100MB — pick a shorter clip or trim it down.`,
-            );
-            return;
-          }
-          if (sizeBytes > SOFT_LIMIT_BYTES && sizeBytes <= MAX_VIDEO_BYTES) {
-            Alert.alert(
-              "Large video",
-              `This clip is ${(sizeBytes / 1024 / 1024).toFixed(1)}MB. It may upload slowly or fail if the storage bucket cap is lower. For best results, trim it shorter in your Photos app first.`,
-              [{ text: "Use it anyway", style: "default" }, { text: "Pick another", style: "cancel" }],
-            );
-          }
-        } catch (e) {
-          console.log("[pickImage] could not read file size, continuing", e);
-        }
-      }
-
-      setMediaLoadFailed(false);
-      setIsVideo(assetIsVideo);
-      setImageUri(asset.uri);
-      if (assetIsVideo) {
-        // Videos are uploaded via file URI (fetch→Blob), not base64
-        setImageBase64(null);
-        const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "mp4";
-        setImageExt(ext === "mov" ? "mov" : "mp4");
-      } else {
-        setImageBase64(asset.base64 ?? null);
-        const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "jpg";
-        setImageExt(ext === "png" ? "png" : "jpg");
-      }
+      setPhotoLoadFailed(false);
+      setPhotoUri(asset.uri);
+      setPhotoBase64(asset.base64 ?? null);
+      const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "jpg";
+      setPhotoExt(ext === "png" ? "png" : "jpg");
     }
   };
 
+  const pickVideo = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["videos"],
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Low,
+      videoExportPreset: ImagePicker.VideoExportPreset.LowQuality,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      const asset = result.assets[0];
+      try {
+        const info = await FileSystem.getInfoAsync(asset.uri);
+        const sizeBytes = info.exists && !info.isDirectory ? info.size : 0;
+        if (sizeBytes > MAX_VIDEO_BYTES) {
+          Alert.alert(
+            "Video too large",
+            `That video is ${(sizeBytes / 1024 / 1024).toFixed(1)}MB. The max is 100MB — pick a shorter clip or trim it down.`,
+          );
+          return;
+        }
+        if (sizeBytes > SOFT_LIMIT_BYTES && sizeBytes <= MAX_VIDEO_BYTES) {
+          Alert.alert(
+            "Large video",
+            `This clip is ${(sizeBytes / 1024 / 1024).toFixed(1)}MB. It may upload slowly or fail if the storage bucket cap is lower. For best results, trim it shorter in your Photos app first.`,
+            [{ text: "Use it anyway", style: "default" }, { text: "Pick another", style: "cancel" }],
+          );
+        }
+      } catch (e) {
+        console.log("[pickVideo] could not read file size, continuing", e);
+      }
+      setVideoUri(asset.uri);
+      const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "mp4";
+      setVideoExt(ext === "mov" ? "mov" : "mp4");
+    }
+  };
+
+  const removePhoto = () => {
+    setPhotoBase64(null);
+    setPhotoUri(null);
+    setPhotoLoadFailed(false);
+  };
+
+  const removeVideo = () => {
+    setVideoUri(null);
+  };
+
   const handlePost = async () => {
-    // Prevent double-tap
     if (posting) return;
     if (!userId) {
       router.push("/auth/login");
@@ -123,42 +134,62 @@ export default function CreateScreen() {
       Alert.alert("Missing category", "Pick a category for your Try.");
       return;
     }
+    if (!hasAnyMedia) {
+      Alert.alert("Add media", "Pick at least one photo or video for your Try.");
+      return;
+    }
     setPosting(true);
     setUploadProgress(0);
     try {
-      let mediaUrl = "";
-      let mediaType: "image" | "video" = "image";
-      if (isVideo && imageUri) {
+      const uploadedItems: { url: string; type: "image" | "video" }[] = [];
+
+      if (hasPhoto && photoBase64) {
         setUploadProgress(10);
-        mediaUrl = await uploadPostVideo(imageUri, imageExt, userId);
-        setUploadProgress(80);
-        mediaType = "video";
-      } else if (imageBase64) {
-        setUploadProgress(10);
-        mediaUrl = await uploadPostMedia(imageBase64, imageExt, userId);
-        setUploadProgress(80);
-        mediaType = "image";
+        const photoUrl = await uploadPostMedia(photoBase64, photoExt, userId);
+        uploadedItems.push({ url: photoUrl, type: "image" });
       }
-      setUploadProgress(90);
-      console.log("[handlePost] creating post:", { mediaUrl, mediaType });
-      await createPost({
-        userId,
-        title: title.trim(),
-        caption: caption.trim(),
-        mediaUrl,
-        mediaType,
-        category,
-        location: location.trim(),
-      });
+
+      if (hasVideo && videoUri) {
+        setUploadProgress(uploadedItems.length > 0 ? 50 : 10);
+        const videoUrl = await uploadPostVideo(videoUri, videoExt, userId);
+        uploadedItems.push({ url: videoUrl, type: "video" });
+      }
+
+      setUploadProgress(85);
+      console.log("[handlePost] creating post with", uploadedItems.length, "media items");
+
+      if (uploadedItems.length > 1) {
+        await createPost({
+          userId,
+          title: title.trim(),
+          caption: caption.trim(),
+          mediaUrl: "",
+          mediaType: uploadedItems[0].type,
+          category,
+          location: location.trim(),
+          mediaItems: uploadedItems,
+        });
+      } else {
+        await createPost({
+          userId,
+          title: title.trim(),
+          caption: caption.trim(),
+          mediaUrl: uploadedItems[0].url,
+          mediaType: uploadedItems[0].type,
+          category,
+          location: location.trim(),
+        });
+      }
+
       setUploadProgress(100);
       // Clear draft on success
       setTitle("");
       setCaption("");
       setCategory("");
       setLocation("");
-      setImageBase64(null);
-      setImageUri(null);
-      setIsVideo(false);
+      setPhotoBase64(null);
+      setPhotoUri(null);
+      setVideoUri(null);
       setShowCustomInput(false);
       setCustomCategory("");
       setUploadProgress(0);
@@ -168,7 +199,6 @@ export default function CreateScreen() {
       router.push("/(tabs)");
     } catch (e) {
       const message = e instanceof Error ? e.message : "Something went wrong.";
-      // Keep draft for retry — don't clear fields on fail
       setUploadProgress(0);
       Alert.alert("Upload failed", "Check your internet and try again. Your draft is saved.");
       console.log("[handlePost] error", message);
@@ -202,36 +232,78 @@ export default function CreateScreen() {
       >
         <Text style={styles.heading}>New Try</Text>
 
-        <TouchableOpacity style={styles.mediaPicker} onPress={pickImage} testID="pick-image-button">
-          {imageUri ? (
-            <View style={styles.mediaPreviewWrap}>
-              <Image
-                source={{ uri: imageUri }}
-                style={styles.mediaPreview}
-                contentFit="cover"
-                onError={() => setMediaLoadFailed(true)}
-                onLoad={() => setMediaLoadFailed(false)}
-              />
-              {mediaLoadFailed ? (
-                <View style={styles.mediaErrorOverlay}>
-                  <Text style={styles.mediaErrorText}>Couldn't load preview</Text>
-                  <Text style={styles.mediaRetryText}>Tap to retry</Text>
+        {/* Dual media picker — photo + video side by side */}
+        <View style={styles.mediaRow}>
+          {/* Photo slot */}
+          <View style={styles.mediaSlot}>
+            {photoUri ? (
+              <View style={styles.mediaPreviewWrap}>
+                <Image
+                  source={{ uri: photoUri }}
+                  style={styles.mediaPreview}
+                  contentFit="cover"
+                  onError={() => setPhotoLoadFailed(true)}
+                  onLoad={() => setPhotoLoadFailed(false)}
+                />
+                {photoLoadFailed ? (
+                  <View style={styles.mediaErrorOverlay}>
+                    <Text style={styles.mediaErrorText}>Couldn't load</Text>
+                  </View>
+                ) : null}
+                <TouchableOpacity style={styles.removeBtn} onPress={removePhoto} testID="remove-photo">
+                  <X size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+                <View style={styles.slotBadge}>
+                  <ImageIcon size={12} color="#FFFFFF" />
+                  <Text style={styles.slotBadgeText}>PHOTO</Text>
                 </View>
-              ) : null}
-              {isVideo ? (
-                <View style={styles.videoBadge}>
-                  <VideoIcon size={16} color="#FFFFFF" />
-                  <Text style={styles.videoBadgeText}>VIDEO</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.mediaPlaceholder}
+                onPress={pickPhoto}
+                testID="pick-photo-button"
+              >
+                <ImageIcon size={28} color={Colors.mutedText} />
+                <Text style={styles.mediaPlaceholderText}>Add Photo</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Video slot */}
+          <View style={styles.mediaSlot}>
+            {videoUri ? (
+              <View style={styles.mediaPreviewWrap}>
+                <Image
+                  source={{ uri: videoUri }}
+                  style={styles.mediaPreview}
+                  contentFit="cover"
+                  transition={200}
+                />
+                <TouchableOpacity style={styles.removeBtn} onPress={removeVideo} testID="remove-video">
+                  <X size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+                <View style={[styles.slotBadge, styles.slotBadgeVideo]}>
+                  <VideoIcon size={12} color="#FFFFFF" />
+                  <Text style={styles.slotBadgeText}>VIDEO</Text>
                 </View>
-              ) : null}
-            </View>
-          ) : (
-            <View style={styles.mediaPlaceholder}>
-              <ImagePlus size={36} color={Colors.mutedText} />
-              <Text style={styles.mediaPlaceholderText}>Add a photo or video</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.mediaPlaceholder}
+                onPress={pickVideo}
+                testID="pick-video-button"
+              >
+                <VideoIcon size={28} color={Colors.mutedText} />
+                <Text style={styles.mediaPlaceholderText}>Add Video</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {hasBoth ? (
+          <Text style={styles.collageHint}>Both will be shown side by side in your post</Text>
+        ) : null}
 
         {/* Upload progress bar */}
         {posting && uploadProgress > 0 ? (
@@ -313,7 +385,7 @@ export default function CreateScreen() {
             placeholderTextColor={Colors.inactiveIcon}
             value={customCategory}
             onChangeText={(text) => {
-              const cleaned = text.trim().split("\s")[0];
+              const cleaned = text.trim().split(/\s/)[0] ?? "";
               setCustomCategory(cleaned);
               if (cleaned.length > 0) {
                 setCategory(cleaned);
@@ -391,35 +463,55 @@ const styles = StyleSheet.create({
     fontWeight: "800" as const,
     marginBottom: 14,
   },
-  mediaPicker: {
+  mediaRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 8,
+  },
+  mediaSlot: {
+    flex: 1,
     borderRadius: 16,
     overflow: "hidden",
-    marginBottom: 16,
   },
   mediaPreviewWrap: {
     width: "100%",
-    height: 240,
+    height: 200,
+    position: "relative",
   },
   mediaPreview: {
     width: "100%",
-    height: 240,
+    height: 200,
     backgroundColor: Colors.surfaceVariant,
   },
-  videoBadge: {
+  removeBtn: {
     position: "absolute",
-    top: 10,
-    right: 10,
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(15,15,15,0.8)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  slotBadge: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 3,
     backgroundColor: "rgba(15,15,15,0.8)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
-  videoBadgeText: {
+  slotBadgeVideo: {
+    backgroundColor: "rgba(255,106,0,0.85)",
+  },
+  slotBadgeText: {
     color: "#FFFFFF",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "800" as const,
     letterSpacing: 0.5,
   },
@@ -435,13 +527,15 @@ const styles = StyleSheet.create({
   },
   mediaErrorText: {
     color: Colors.error,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700" as const,
   },
-  mediaRetryText: {
-    color: Colors.mutedText,
+  collageHint: {
+    color: Colors.flameOrange,
     fontSize: 12,
-    marginTop: 4,
+    fontWeight: "600" as const,
+    textAlign: "center",
+    marginBottom: 12,
   },
   progressContainer: {
     marginBottom: 12,
@@ -471,7 +565,7 @@ const styles = StyleSheet.create({
   },
   mediaPlaceholder: {
     width: "100%",
-    height: 180,
+    height: 200,
     backgroundColor: Colors.softGray,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -483,7 +577,7 @@ const styles = StyleSheet.create({
   },
   mediaPlaceholderText: {
     color: Colors.mutedText,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600" as const,
   },
   label: {
