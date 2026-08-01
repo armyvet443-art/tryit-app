@@ -1261,9 +1261,10 @@ export async function deletePost(postId: string, mediaUrl: string): Promise<void
 /** Update a post's caption and/or category. */
 export async function updatePost(
   postId: string,
-  updates: { caption?: string; category?: string },
+  updates: { title?: string; caption?: string; category?: string },
 ): Promise<void> {
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (updates.title !== undefined) patch.title = updates.title;
   if (updates.caption !== undefined) patch.caption = updates.caption;
   if (updates.category !== undefined) patch.category = updates.category;
   const { error } = await supabase.from("posts").update(patch).eq("id", postId);

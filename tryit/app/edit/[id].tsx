@@ -37,8 +37,10 @@ export default function EditPostScreen() {
 
   const post = postQuery.data;
 
+  const [title, setTitle] = useState<string>("");
   const [caption, setCaption] = useState<string>("");
   const [category, setCategory] = useState<string>("");
+  const [originalTitle, setOriginalTitle] = useState<string>("");
   const [originalCaption, setOriginalCaption] = useState<string>("");
   const [originalCategory, setOriginalCategory] = useState<string>("");
   const [showCustomInput, setShowCustomInput] = useState<boolean>(false);
@@ -49,8 +51,10 @@ export default function EditPostScreen() {
   // Pre-fill fields once the post loads
   useEffect(() => {
     if (post && !initialized) {
+      setTitle(post.title);
       setCaption(post.caption);
       setCategory(post.category);
+      setOriginalTitle(post.title);
       setOriginalCaption(post.caption);
       setOriginalCategory(post.category);
       // If the post's category isn't in the standard list, it's a custom one
@@ -68,8 +72,11 @@ export default function EditPostScreen() {
   );
 
   const hasChanges = useMemo(
-    () => caption !== originalCaption || category !== originalCategory,
-    [caption, category, originalCaption, originalCategory],
+    () =>
+      title !== originalTitle ||
+      caption !== originalCaption ||
+      category !== originalCategory,
+    [title, caption, category, originalTitle, originalCaption, originalCategory],
   );
 
   // Owner check — only the post author can edit
@@ -79,7 +86,11 @@ export default function EditPostScreen() {
     if (!hasChanges || saving) return;
     setSaving(true);
     try {
-      await updatePost(postId, { caption: caption.trim(), category });
+      await updatePost(postId, {
+        title: title.trim(),
+        caption: caption.trim(),
+        category,
+      });
       queryClient.invalidateQueries({ queryKey: ["post", postId] });
       queryClient.invalidateQueries({ queryKey: ["feed"] });
       queryClient.invalidateQueries({ queryKey: ["userPosts"] });
@@ -92,7 +103,7 @@ export default function EditPostScreen() {
     } finally {
       setSaving(false);
     }
-  }, [hasChanges, saving, caption, category, postId, queryClient, router]);
+  }, [hasChanges, saving, title, caption, category, postId, queryClient, router]);
 
   if (postQuery.isLoading) {
     return (
@@ -143,11 +154,17 @@ export default function EditPostScreen() {
           <View style={styles.backBtnPlaceholder} />
         </View>
 
-        {/* Title (read-only) */}
+        {/* Title (editable) */}
         <Text style={styles.label}>Title</Text>
-        <View style={[styles.input, styles.readOnlyInput]}>
-          <Text style={styles.readOnlyText}>{post.title}</Text>
-        </View>
+        <TextInput
+          testID="edit-title-input"
+          style={styles.input}
+          placeholder="Give your try a title"
+          placeholderTextColor={Colors.inactiveIcon}
+          value={title}
+          onChangeText={setTitle}
+          maxLength={100}
+        />
 
         {/* Caption (editable) */}
         <Text style={styles.label}>Caption</Text>
@@ -316,14 +333,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: Colors.text,
     fontSize: 15,
-  },
-  readOnlyInput: {
-    opacity: 0.6,
-  },
-  readOnlyText: {
-    color: Colors.text,
-    fontSize: 15,
-    fontWeight: "600" as const,
   },
   multiline: {
     minHeight: 90,
