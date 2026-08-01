@@ -305,8 +305,8 @@ export default function PostDetailScreen() {
   }, [isSaved, postId, userId, router, queryClient]);
 
   const handleSend = useCallback(async () => {
-    // Require auth or guest_id — show login modal if neither.
-    if (!userId && (!guestId || guestId.length === 0)) {
+    // Require auth — guests cannot comment.
+    if (!userId) {
       setShowLoginModal(true);
       return;
     }
@@ -315,9 +315,9 @@ export default function PostDetailScreen() {
     setSending(true);
     try {
       if (replyTo) {
-        await addReply(postId, replyTo, text, userId, guestId);
+        await addReply(postId, replyTo, text, userId);
       } else {
-        await addComment(postId, text, userId, guestId);
+        await addComment(postId, text, userId);
       }
       setCommentText("");
       setReplyTo(null);
@@ -330,20 +330,20 @@ export default function PostDetailScreen() {
     } finally {
       setSending(false);
     }
-  }, [commentText, postId, userId, guestId, replyTo, sending, queryClient]);
+  }, [commentText, postId, userId, replyTo, sending, queryClient]);
 
   const handleReply = useCallback((parentId: string) => {
-    if (!userId && (!guestId || guestId.length === 0)) {
+    if (!userId) {
       setShowLoginModal(true);
       return;
     }
     setReplyTo(parentId);
     inputRef.current?.focus();
-  }, [userId, guestId]);
+  }, [userId]);
 
   const handleDeleteComment = useCallback(
     async (commentId: string) => {
-      if (!userId && (!guestId || guestId.length === 0)) return;
+      if (!userId) return;
       Alert.alert("Delete comment?", "This cannot be undone.", [
         { text: "Cancel", style: "cancel" },
         {
@@ -356,7 +356,7 @@ export default function PostDetailScreen() {
               (old) => (old ? old.filter((c) => c.id !== commentId) : old),
             );
             try {
-              await deleteComment(commentId, userId, guestId);
+              await deleteComment(commentId, userId);
               queryClient.invalidateQueries({ queryKey: ["comments", postId] });
               queryClient.invalidateQueries({ queryKey: ["post", postId] });
             } catch (e) {
@@ -369,7 +369,7 @@ export default function PostDetailScreen() {
         },
       ]);
     },
-    [userId, guestId, postId, queryClient],
+    [userId, postId, queryClient],
   );
 
   const [isSharePressed, setIsSharePressed] = useState(false);
@@ -691,7 +691,6 @@ export default function PostDetailScreen() {
             <CommentThread
               nodes={commentTree}
               currentUserId={userId}
-              currentGuestId={guestId}
               onReply={handleReply}
               onDelete={handleDeleteComment}
             />
@@ -723,7 +722,7 @@ export default function PostDetailScreen() {
           onChangeText={setCommentText}
           maxLength={280}
           onFocus={() => {
-            if (!userId && (!guestId || guestId.length === 0)) {
+            if (!userId) {
               setShowLoginModal(true);
             }
           }}

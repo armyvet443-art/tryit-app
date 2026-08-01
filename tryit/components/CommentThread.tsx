@@ -16,7 +16,6 @@ interface CommentNode {
 interface CommentThreadProps {
   nodes: CommentNode[];
   currentUserId: string | null;
-  currentGuestId: string;
   onReply: (parentId: string) => void;
   onDelete: (commentId: string) => void;
   depth?: number;
@@ -37,7 +36,7 @@ export function buildCommentTree(comments: CommentItem[]): CommentNode[] {
   return roots;
 }
 
-export default function CommentThread({ nodes, currentUserId, currentGuestId, onReply, onDelete, depth = 0 }: CommentThreadProps) {
+export default function CommentThread({ nodes, currentUserId, onReply, onDelete, depth = 0 }: CommentThreadProps) {
   return (
     <View>
       {nodes.map((node) => (
@@ -45,7 +44,6 @@ export default function CommentThread({ nodes, currentUserId, currentGuestId, on
           key={node.comment.id}
           node={node}
           currentUserId={currentUserId}
-          currentGuestId={currentGuestId}
           onReply={onReply}
           onDelete={onDelete}
           depth={depth}
@@ -58,14 +56,12 @@ export default function CommentThread({ nodes, currentUserId, currentGuestId, on
 function CommentRow({
   node,
   currentUserId,
-  currentGuestId,
   onReply,
   onDelete,
   depth,
 }: {
   node: CommentNode;
   currentUserId: string | null;
-  currentGuestId: string;
   onReply: (parentId: string) => void;
   onDelete: (commentId: string) => void;
   depth: number;
@@ -73,11 +69,9 @@ function CommentRow({
   const router = useRouter();
   const [showReplies, setShowReplies] = useState<boolean>(true);
   const comment = node.comment;
-  // Owner check: either user_id matches (authenticated) or guest_id matches (anonymous)
-  const isOwn = (currentUserId && comment.user_id && currentUserId === comment.user_id) ||
-    (!currentUserId && comment.guest_id && currentGuestId === comment.guest_id);
-  const isGuest = !comment.user_id && !!comment.guest_id;
-  const displayName = comment.author?.display_name ?? (isGuest ? "Guest" : "User");
+  // Owner check: only authenticated user_id match (guests cannot comment)
+  const isOwn = !!(currentUserId && comment.user_id && currentUserId === comment.user_id);
+  const displayName = comment.author?.display_name ?? "User";
 
   const openProfile = useCallback(() => {
     if (comment.user_id) {
@@ -89,12 +83,12 @@ function CommentRow({
 
   return (
     <View style={[styles.row, { paddingLeft: 16 + depth * 24 }]}>
-      <TouchableOpacity onPress={openProfile} disabled={isGuest}>
+      <TouchableOpacity onPress={openProfile}>
         <Avatar uri={comment.author?.avatar_url} name={displayName} size={32} />
       </TouchableOpacity>
       <View style={styles.body}>
         <View style={styles.meta}>
-          <TouchableOpacity onPress={openProfile} disabled={isGuest}>
+          <TouchableOpacity onPress={openProfile}>
             <Text style={styles.author} numberOfLines={1}>
               {displayName}
             </Text>
@@ -130,7 +124,6 @@ function CommentRow({
               <CommentThread
                 nodes={node.replies}
                 currentUserId={currentUserId}
-                currentGuestId={currentGuestId}
                 onReply={onReply}
                 onDelete={onDelete}
                 depth={depth + 1}

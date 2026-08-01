@@ -667,46 +667,25 @@ export async function getComments(postId: string): Promise<CommentItem[]> {
   });
 }
 
-/** Add a comment. Authenticated users pass userId; guests pass guestId.
+/** Add a comment. Requires authentication — guests cannot comment.
  *  Also creates a notification for the post owner (best-effort). */
 export async function addComment(
   postId: string,
   content: string,
   userId: string | null,
-  guestId: string,
 ): Promise<void> {
+  if (!userId) throw new Error("You must be signed in to comment.");
   const trimmed = content.trim();
   if (trimmed.length === 0) throw new Error("Comment cannot be empty.");
-  if (trimmed.length > 500) throw new Error("Comment is too long (max 500 characters).");
-  // Build insert payload — only include columns that exist in the comments table.
-  // The table schema is: id, post_id, user_id, parent_id, content, created_at, updated_at, like_count.
-  // guest_id is added by migration 20260729000030 — if not yet applied, omitting it avoids PGRST204.
-  const row: Record<string, unknown> = {
+  if (trimmed.length > 280) throw new Error("Comment is too long (max 280 characters).");
+  const { error } = await supabase.from("comments").insert({
     post_id: postId,
+    user_id: userId,
     content: trimmed,
-  };
-  if (userId) {
-    row.user_id = userId;
-  } else if (guestId) {
-    // Only include guest_id if the column exists (migration applied).
-    // If it doesn't exist, Supabase returns PGRST204 — we catch and retry without it.
-    row.guest_id = guestId;
-  }
-  let { error } = await supabase.from("comments").insert(row);
+  });
   if (error) {
     console.log("[addComment] insert error", postId, error.code, error.message);
-    // If guest_id column doesn't exist, retry without it (guest commenting needs the migration).
-    if (error.code === "PGRST204" && "guest_id" in row) {
-      console.log("[addComment] retrying without guest_id column");
-      const fallbackRow = { post_id: postId, content: trimmed };
-      const retry = await supabase.from("comments").insert(fallbackRow);
-      if (retry.error) {
-        console.log("[addComment] retry insert error", retry.error.code, retry.error.message);
-        throw retry.error;
-      }
-    } else {
-      throw error;
-    }
+    throw error;
   }
   // Best-effort: notify the post owner about the comment
   try {
@@ -719,24 +698,20 @@ export async function addComment(
       const postOwnerId = String(post.user_id);
       // Fetch commenter's display name for the notification message
       let commenterName = "Someone";
-      if (userId) {
-        const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("display_name, username")
-          .eq("id", userId)
-          .maybeSingle();
-        if (profile) {
-          commenterName = String(profile.display_name || profile.username || "Someone");
-        }
-      } else {
-        commenterName = "A guest";
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("display_name, username")
+        .eq("id", userId)
+        .maybeSingle();
+      if (profile) {
+        commenterName = String(profile.display_name || profile.username || "Someone");
       }
       const postTitle = String(post.title ?? "your post");
       const snippet = postTitle.length > 30 ? postTitle.slice(0, 30) + "..." : postTitle;
       await createNotification({
         recipientId: postOwnerId,
         actorId: userId,
-        actorGuestId: userId ? null : guestId,
+        actorGuestId: null,
         postId,
         type: "comment",
         message: `${commenterName} commented on "${snippet}"`,
@@ -747,63 +722,41 @@ export async function addComment(
   }
 }
 
-/** Reply to a comment (sets parent_id). Authenticated users pass userId; guests pass guestId. */
+/** Reply to a comment (sets parent_id). Requires authentication — guests cannot reply. */
 export async function addReply(
   postId: string,
   parentId: string,
   content: string,
   userId: string | null,
-  guestId: string,
 ): Promise<void> {
+  if (!userId) throw new Error("You must be signed in to reply.");
   const trimmed = content.trim();
   if (trimmed.length === 0) throw new Error("Reply cannot be empty.");
-  if (trimmed.length > 500) throw new Error("Reply is too long (max 500 characters).");
-  const row: Record<string, unknown> = {
+  if (trimmed.length > 280) throw new Error("Reply is too long (max 280 characters).");
+  const { error } = await supabase.from("comments").insert({
     post_id: postId,
     parent_id: parentId,
+    user_id: userId,
     content: trimmed,
-  };
-  if (userId) {
-    row.user_id = userId;
-  } else if (guestId) {
-    row.guest_id = guestId;
-  }
-  let { error } = await supabase.from("comments").insert(row);
+  });
   if (error) {
     console.log("[addReply] insert error", postId, error.code, error.message);
-    if (error.code === "PGRST204" && "guest_id" in row) {
-      const fallbackRow = { post_id: postId, parent_id: parentId, content: trimmed };
-      const retry = await supabase.from("comments").insert(fallbackRow);
-      if (retry.error) {
-        console.log("[addReply] retry insert error", retry.error.code, retry.error.message);
-        throw retry.error;
-      }
-    } else {
-      throw error;
-    }
+    throw error;
   }
 }
 
-/** Delete a comment. Authenticated users match by user_id; guests match by guest_id.
+/** Delete a comment. Requires authentication — only the comment owner can delete.
  *  RLS policies enforce ownership on the server side as well. */
 export async function deleteComment(
   commentId: string,
   userId: string | null,
-  guestId: string,
 ): Promise<void> {
-  // Try with guest_id first; if column doesn't exist (PGRST204), fall back to id-only.
-  let query = supabase.from("comments").delete().eq("id", commentId);
-  if (userId) {
-    query = query.eq("user_id", userId);
-  } else {
-    query = query.eq("guest_id", guestId).is("user_id", null);
-  }
-  let { error } = await query;
-  if (error && error.code === "PGRST204" && !userId) {
-    // guest_id column doesn't exist — retry with id-only delete.
-    const retry = await supabase.from("comments").delete().eq("id", commentId);
-    error = retry.error;
-  }
+  if (!userId) throw new Error("You must be signed in to delete a comment.");
+  const { error } = await supabase
+    .from("comments")
+    .delete()
+    .eq("id", commentId)
+    .eq("user_id", userId);
   if (error) {
     console.log("[deleteComment] error", commentId, error.code, error.message);
     throw error;
