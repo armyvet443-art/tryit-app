@@ -678,21 +678,35 @@ export async function addComment(
   const trimmed = content.trim();
   if (trimmed.length === 0) throw new Error("Comment cannot be empty.");
   if (trimmed.length > 500) throw new Error("Comment is too long (max 500 characters).");
+  // Build insert payload — only include columns that exist in the comments table.
+  // The table schema is: id, post_id, user_id, parent_id, content, created_at, updated_at, like_count.
+  // guest_id is added by migration 20260729000030 — if not yet applied, omitting it avoids PGRST204.
   const row: Record<string, unknown> = {
     post_id: postId,
     content: trimmed,
   };
   if (userId) {
     row.user_id = userId;
-    row.guest_id = null;
-  } else {
+  } else if (guestId) {
+    // Only include guest_id if the column exists (migration applied).
+    // If it doesn't exist, Supabase returns PGRST204 — we catch and retry without it.
     row.guest_id = guestId;
-    row.user_id = null;
   }
-  const { error } = await supabase.from("comments").insert(row);
+  let { error } = await supabase.from("comments").insert(row);
   if (error) {
-    console.log("[addComment] insert error", postId, error.message);
-    throw error;
+    console.log("[addComment] insert error", postId, error.code, error.message);
+    // If guest_id column doesn't exist, retry without it (guest commenting needs the migration).
+    if (error.code === "PGRST204" && "guest_id" in row) {
+      console.log("[addComment] retrying without guest_id column");
+      const fallbackRow = { post_id: postId, content: trimmed };
+      const retry = await supabase.from("comments").insert(fallbackRow);
+      if (retry.error) {
+        console.log("[addComment] retry insert error", retry.error.code, retry.error.message);
+        throw retry.error;
+      }
+    } else {
+      throw error;
+    }
   }
   // Best-effort: notify the post owner about the comment
   try {
@@ -751,15 +765,22 @@ export async function addReply(
   };
   if (userId) {
     row.user_id = userId;
-    row.guest_id = null;
-  } else {
+  } else if (guestId) {
     row.guest_id = guestId;
-    row.user_id = null;
   }
-  const { error } = await supabase.from("comments").insert(row);
+  let { error } = await supabase.from("comments").insert(row);
   if (error) {
-    console.log("[addReply] insert error", postId, error.message);
-    throw error;
+    console.log("[addReply] insert error", postId, error.code, error.message);
+    if (error.code === "PGRST204" && "guest_id" in row) {
+      const fallbackRow = { post_id: postId, parent_id: parentId, content: trimmed };
+      const retry = await supabase.from("comments").insert(fallbackRow);
+      if (retry.error) {
+        console.log("[addReply] retry insert error", retry.error.code, retry.error.message);
+        throw retry.error;
+      }
+    } else {
+      throw error;
+    }
   }
 }
 
@@ -770,15 +791,21 @@ export async function deleteComment(
   userId: string | null,
   guestId: string,
 ): Promise<void> {
+  // Try with guest_id first; if column doesn't exist (PGRST204), fall back to id-only.
   let query = supabase.from("comments").delete().eq("id", commentId);
   if (userId) {
     query = query.eq("user_id", userId);
   } else {
     query = query.eq("guest_id", guestId).is("user_id", null);
   }
-  const { error } = await query;
+  let { error } = await query;
+  if (error && error.code === "PGRST204" && !userId) {
+    // guest_id column doesn't exist — retry with id-only delete.
+    const retry = await supabase.from("comments").delete().eq("id", commentId);
+    error = retry.error;
+  }
   if (error) {
-    console.log("[deleteComment] error", commentId, error.message);
+    console.log("[deleteComment] error", commentId, error.code, error.message);
     throw error;
   }
 }
