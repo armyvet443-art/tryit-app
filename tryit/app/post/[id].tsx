@@ -37,7 +37,6 @@ import {
   fetchPost,
   getComments,
   getFollowingIds,
-  getGuestReaction,
   getMyReactions,
   getReactionCounts,
   getSavedSet,
@@ -68,7 +67,7 @@ const REACTION_ORDER: ReactionType[] = ["must_try", "worth_it", "maybe", "not_fo
 export default function PostDetailScreen() {
   const { id, focusComment } = useLocalSearchParams<{ id: string; focusComment?: string }>();
   const postId = String(id ?? "");
-  const { userId, guestId } = useAuth();
+  const { userId } = useAuth();
   const shouldFocusComment = focusComment === "true";
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -137,15 +136,13 @@ export default function PostDetailScreen() {
     };
   }, [postId, queryClient]);
 
-  // Authenticated user's reaction (or guest reaction)
+  // Authenticated user's reaction (guests get null — voting requires auth)
   const myReactionQuery = useQuery<ReactionType | null>({
     queryKey: ["myReaction", userId, postId],
     queryFn: async () => {
-      if (userId) {
-        const map = await getMyReactions([postId], userId);
-        return map[postId] ?? null;
-      }
-      return getGuestReaction(postId, guestId);
+      if (!userId) return null;
+      const map = await getMyReactions([postId], userId);
+      return map[postId] ?? null;
     },
     enabled: postId.length > 0,
   });
@@ -171,9 +168,10 @@ export default function PostDetailScreen() {
   });
 
   const fireQuery = useQuery<{ fired: boolean; count: number }>({
-    queryKey: ["fireDetail", userId, guestId, postId],
+    queryKey: ["fireDetail", userId, postId],
     queryFn: async () => {
-      const fired = await checkIsFired(postId, userId, guestId);
+      if (!userId) return { fired: false, count: 0 };
+      const fired = await checkIsFired(postId, userId);
       const { count, error } = await supabase
         .from("post_likes")
         .select("id", { count: "exact", head: true })
@@ -226,6 +224,10 @@ export default function PostDetailScreen() {
 
   const handleReact = useCallback(
     async (type: ReactionType) => {
+      if (!userId) {
+        setShowLoginModal(true);
+        return;
+      }
       if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const previous = reaction;
       const nextReaction = previous === type ? null : type;
@@ -235,7 +237,7 @@ export default function PostDetailScreen() {
       setReaction(nextReaction);
       setCounts(nextCounts);
       try {
-        const freshCounts = await upsertReaction(postId, nextReaction, userId, guestId);
+        const freshCounts = await upsertReaction(postId, nextReaction, userId);
         setCounts(freshCounts);
       } catch (e) {
         console.log("[reaction] upsert failed", e);
@@ -243,10 +245,14 @@ export default function PostDetailScreen() {
         setCounts(counts);
       }
     },
-    [reaction, counts, postId, userId, guestId],
+    [reaction, counts, postId, userId],
   );
 
   const handleFire = useCallback(async () => {
+    if (!userId) {
+      setShowLoginModal(true);
+      return;
+    }
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Animated.sequence([
       Animated.timing(fireScale, { toValue: 1.3, duration: 80, useNativeDriver: true }),
@@ -256,7 +262,7 @@ export default function PostDetailScreen() {
     setIsFired(next);
     setFireCount((c) => Math.max(0, c + (next ? 1 : -1)));
     try {
-      const freshCount = await toggleFire(postId, userId, guestId);
+      const freshCount = await toggleFire(postId, userId);
       setFireCount(freshCount);
       queryClient.invalidateQueries({ queryKey: ["fireCounts"] });
       queryClient.invalidateQueries({ queryKey: ["myFires"] });
@@ -265,7 +271,7 @@ export default function PostDetailScreen() {
       setIsFired(!next);
       setFireCount((c) => Math.max(0, c + (next ? -1 : 1)));
     }
-  }, [isFired, fireScale, postId, userId, guestId, queryClient]);
+  }, [isFired, fireScale, postId, userId, queryClient]);
 
   const handleTried = useCallback(async () => {
     if (!userId) {
@@ -459,7 +465,7 @@ export default function PostDetailScreen() {
         selectedReason,
         selectedReason === "Other" ? reportDetails.trim() || null : null,
         userId,
-        guestId,
+        "",
       );
       setReportVisible(false);
       setSelectedReason(null);
@@ -471,7 +477,7 @@ export default function PostDetailScreen() {
     } finally {
       setIsReporting(false);
     }
-  }, [selectedReason, isReporting, post, postId, reportDetails, userId, guestId]);
+  }, [selectedReason, isReporting, post, postId, reportDetails, userId]);
 
   const handleBlock = useCallback(() => {
     setMenuVisible(false);
@@ -489,7 +495,7 @@ export default function PostDetailScreen() {
             if (isBlocking) return;
             setIsBlocking(true);
             try {
-              await blockUser(post.user_id, userId, guestId);
+              await blockUser(post.user_id, userId, "");
               queryClient.invalidateQueries({ queryKey: ["feed"] });
               queryClient.invalidateQueries({ queryKey: ["explore-trending"] });
               queryClient.invalidateQueries({ queryKey: ["explore-category"] });
@@ -505,7 +511,7 @@ export default function PostDetailScreen() {
         },
       ],
     );
-  }, [post, userId, guestId, isBlocking, queryClient, router]);
+  }, [post, userId, isBlocking, queryClient, router]);
 
   const openAuthor = useCallback(() => {
     if (post) router.push({ pathname: "/user/[id]", params: { id: post.user_id } });

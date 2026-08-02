@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/lib/supabase";
 import { getOrCreateGuestId, getProfile, migrateGuestData } from "@/services/tryit-service";
+// Note: migrateGuestData is now a no-op since guest voting is disabled.
 import type { UserProfile } from "@/types/models";
 
 export const [AuthProvider, useAuth] = createContextHook(() => {

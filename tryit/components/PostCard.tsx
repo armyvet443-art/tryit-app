@@ -72,10 +72,10 @@ export default function PostCard({
   onDeleted,
   onBlocked,
 }: PostCardProps) {
-  const { userId, guestId } = useAuth();
+  const { userId } = useAuth();
   const router = useRouter();
 
-  // Owner check — either logged-in user_id matches, or guest_id matches (for anonymous posts)
+  // Owner check — only the logged-in user can edit/delete their own posts
   const isOwner = userId !== null ? post.user_id === userId : false;
 
   const [menuVisible, setMenuVisible] = useState<boolean>(false);
@@ -120,6 +120,10 @@ export default function PostCard({
 
   const handleReact = useCallback(
     async (type: ReactionType) => {
+      if (!userId) {
+        setShowLoginModal(true);
+        return;
+      }
       if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const previous = reaction;
       // Optimistic update: toggle off if same, otherwise switch.
@@ -130,16 +134,16 @@ export default function PostCard({
       setReaction(nextReaction);
       setCounts(nextCounts);
       try {
-        const freshCounts = await upsertReaction(post.id, nextReaction, userId, guestId);
+        const freshCounts = await upsertReaction(post.id, nextReaction, userId);
         setCounts(freshCounts);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.log("[reaction] upsert failed", { postId: post.id, reaction: nextReaction, userId, guestId, error: msg });
+        console.log("[reaction] upsert failed", { postId: post.id, reaction: nextReaction, userId, error: msg });
         setReaction(previous);
         setCounts(counts);
       }
     },
-    [reaction, counts, post.id, userId, guestId],
+    [reaction, counts, post.id, userId],
   );
 
   const handleTried = useCallback(async () => {
@@ -177,6 +181,10 @@ export default function PostCard({
   }, [isSaved, post.id, userId, router]);
 
   const handleFire = useCallback(async () => {
+    if (!userId) {
+      setShowLoginModal(true);
+      return;
+    }
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Animated.sequence([
       Animated.timing(fireScale, { toValue: 1.3, duration: 80, useNativeDriver: true }),
@@ -186,19 +194,24 @@ export default function PostCard({
     setIsFired(next);
     setFireCountState((c) => Math.max(0, c + (next ? 1 : -1)));
     try {
-      const freshCount = await toggleFire(post.id, userId, guestId);
+      const freshCount = await toggleFire(post.id, userId);
       setFireCountState(freshCount);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.log("[fire] toggle failed", { postId: post.id, userId, guestId, error: msg });
+      console.log("[fire] toggle failed", { postId: post.id, userId, error: msg });
       setIsFired(!next);
       setFireCountState((c) => Math.max(0, c + (next ? -1 : 1)));
     }
-  }, [isFired, fireScale, post.id, userId, guestId]);
+  }, [isFired, fireScale, post.id, userId]);
 
   const [isSharePressed, setIsSharePressed] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
 
   const handleShare = useCallback(async () => {
+    if (!userId) {
+      setShowLoginModal(true);
+      return;
+    }
     const link = `https://tryit-rn-migration.rork.app/post/${post.id}`;
     try {
       if (Share.share) {
@@ -219,7 +232,7 @@ export default function PostCard({
     } catch {
       Alert.alert("Share", link);
     }
-  }, [post.id]);
+  }, [post.id, userId]);
 
   const handleEdit = useCallback(() => {
     setMenuVisible(false);
@@ -273,7 +286,7 @@ export default function PostCard({
         selectedReason,
         selectedReason === "Other" ? reportDetails.trim() || null : null,
         userId,
-        guestId,
+        "",
       );
       setReportVisible(false);
       setSelectedReason(null);
@@ -285,7 +298,7 @@ export default function PostCard({
     } finally {
       setIsReporting(false);
     }
-  }, [selectedReason, isReporting, post.id, reportDetails, userId, guestId]);
+  }, [selectedReason, isReporting, post.id, reportDetails, userId]);
 
   const handleBlock = useCallback(() => {
     setMenuVisible(false);
@@ -303,7 +316,7 @@ export default function PostCard({
             if (isBlocking) return;
             setIsBlocking(true);
             try {
-              await blockUser(post.user_id, userId, guestId);
+              await blockUser(post.user_id, userId, "");
               if (onBlocked) onBlocked(post.user_id);
               Alert.alert("Blocked", `@${username} has been blocked.`);
             } catch (e) {
@@ -316,7 +329,7 @@ export default function PostCard({
         },
       ],
     );
-  }, [post.user_id, post.author?.username, userId, guestId, isBlocking, onBlocked]);
+  }, [post.user_id, post.author?.username, userId, isBlocking, onBlocked]);
 
   const openAuthor = useCallback(() => {
     router.push({ pathname: "/user/[id]", params: { id: post.user_id } });
@@ -531,6 +544,44 @@ export default function PostCard({
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Login prompt for guests trying to vote or share */}
+      <Modal
+        visible={showLoginModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLoginModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setShowLoginModal(false)}
+        >
+          <View style={styles.menuSheet}>
+            <Text style={[styles.menuItemText, { textAlign: "center", paddingTop: 20, paddingBottom: 4 }]}>
+              Sign in to vote and share
+            </Text>
+            <Text style={[styles.reasonText, { textAlign: "center", paddingBottom: 16, color: Colors.mutedText }]}>
+              Join TryIt to react to posts and share with friends.
+            </Text>
+            <TouchableOpacity
+              style={[styles.reportSubmitBtn, { marginBottom: 8 }]}
+              onPress={() => {
+                setShowLoginModal(false);
+                router.push("/auth/login");
+              }}
+            >
+              <Text style={styles.reportSubmitText}>Log In / Sign Up</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuItem, styles.menuItemLast]}
+              onPress={() => setShowLoginModal(false)}
+            >
+              <Text style={[styles.menuItemText, { color: Colors.mutedText }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Post menu modal */}
       <Modal

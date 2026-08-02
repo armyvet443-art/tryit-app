@@ -24,8 +24,6 @@ import {
   getBlockedUserIds,
   getFireCountsBatch,
   getFollowingIds,
-  getGuestFires,
-  getGuestReactions,
   getMyFires,
   getMyReactions,
   getReactionCountsBatch,
@@ -68,7 +66,7 @@ const FEED_TABS: { key: FeedType; label: string; emoji: string }[] = [
 ];
 
 export default function FeedScreen() {
-  const { userId, guestId } = useAuth();
+  const { userId } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -81,8 +79,8 @@ export default function FeedScreen() {
 
   // Fetch blocked user IDs so we can filter them from the feed (client-side).
   const blockedQuery = useQuery<Set<string>>({
-    queryKey: ["blockedIds", userId, guestId],
-    queryFn: () => getBlockedUserIds(userId, guestId),
+    queryKey: ["blockedIds", userId],
+    queryFn: () => getBlockedUserIds(userId, ""),
   });
 
   const posts = useMemo(
@@ -93,12 +91,9 @@ export default function FeedScreen() {
   const postIdsKey = postIds.join(",");
 
   const reactionsQuery = useQuery<Record<string, ReactionType>>({
-    queryKey: ["myReactions", userId, guestId, postIdsKey],
-    queryFn: () =>
-      userId
-        ? getMyReactions(postIds, userId)
-        : getGuestReactions(postIds, guestId),
-    enabled: postIds.length > 0 && (userId !== null || guestId.length > 0),
+    queryKey: ["myReactions", userId, postIdsKey],
+    queryFn: () => getMyReactions(postIds, userId as string),
+    enabled: userId !== null && postIds.length > 0,
   });
 
   // Reaction counts read straight from the reactions table (batch) — no RPC,
@@ -134,12 +129,9 @@ export default function FeedScreen() {
   });
 
   const myFiresQuery = useQuery<Set<string>>({
-    queryKey: ["myFires", userId, guestId, postIdsKey],
-    queryFn: () =>
-      userId
-        ? getMyFires(postIds, userId)
-        : getGuestFires(postIds, guestId),
-    enabled: postIds.length > 0 && (userId !== null || guestId.length > 0),
+    queryKey: ["myFires", userId, postIdsKey],
+    queryFn: () => getMyFires(postIds, userId as string),
+    enabled: userId !== null && postIds.length > 0,
   });
 
   const onRefresh = useCallback(() => {

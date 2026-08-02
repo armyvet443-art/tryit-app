@@ -186,73 +186,50 @@ async function countReactions(postId: string): Promise<ReactionCounts> {
   return counts;
 }
 
-/** Delete the existing reaction row for this user/guest on the given post. */
-async function deleteExistingReaction(postId: string, userId: string | null, guestId: string): Promise<void> {
-  if (userId) {
-    const { error } = await supabase
-      .from("reactions")
-      .delete()
-      .eq("post_id", postId)
-      .eq("user_id", userId);
-    if (error) throw error;
-  } else {
-    const { error } = await supabase
-      .from("reactions")
-      .delete()
-      .eq("post_id", postId)
-      .eq("guest_id", guestId)
-      .is("user_id", null);
-    if (error) throw error;
-  }
+/** Delete the existing reaction row for this user on the given post. Requires auth. */
+async function deleteExistingReaction(postId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from("reactions")
+    .delete()
+    .eq("post_id", postId)
+    .eq("user_id", userId);
+  if (error) throw error;
 }
 
 /**
  * Set or toggle a reaction. Pass `null` as `reaction` to un-react.
+ * Requires authentication — guests cannot vote.
  * Returns the fresh counts read from the reactions table so callers can render
  * the result without an extra fetch and without flicker.
  */
 export async function upsertReaction(
   postId: string,
   reaction: ReactionType | null,
-  userId: string | null,
-  guestId: string,
+  userId: string,
 ): Promise<ReactionCounts> {
-  console.log("[upsertReaction] start", { postId, reaction, userId, guestId });
-  await deleteExistingReaction(postId, userId, guestId);
+  await deleteExistingReaction(postId, userId);
   if (reaction) {
-    const row: Record<string, unknown> = {
+    const { error } = await supabase.from("reactions").insert({
       post_id: postId,
       reaction_type: reaction,
-    };
-    if (userId) {
-      row.user_id = userId;
-      row.guest_id = null;
-    } else {
-      row.guest_id = guestId;
-      row.user_id = null;
-    }
-    const { error } = await supabase.from("reactions").insert(row);
+      user_id: userId,
+    });
     if (error) {
       console.log("[upsertReaction] insert error", postId, error.message);
       throw error;
     }
   }
   const counts = await countReactions(postId);
-  console.log("[upsertReaction] done", postId, counts);
   return counts;
 }
 
-/** Un-react. Returns fresh counts. */
+/** Un-react. Requires auth. Returns fresh counts. */
 export async function deleteReaction(
   postId: string,
-  userId: string | null,
-  guestId: string,
+  userId: string,
 ): Promise<ReactionCounts> {
-  console.log("[deleteReaction] start", { postId, userId, guestId });
-  await deleteExistingReaction(postId, userId, guestId);
-  const counts = await countReactions(postId);
-  console.log("[deleteReaction] done", postId, counts);
-  return counts;
+  await deleteExistingReaction(postId, userId);
+  return countReactions(postId);
 }
 
 /** Batch-fetch reaction counts for many posts (used by the feed). */
@@ -302,113 +279,42 @@ export async function getMyReactions(
   return map;
 }
 
-export async function getGuestReaction(postId: string, guestId: string): Promise<ReactionType | null> {
-  const { data, error } = await supabase
-    .from("reactions")
-    .select("reaction_type")
-    .eq("post_id", postId)
-    .eq("guest_id", guestId)
-    .is("user_id", null)
-    .maybeSingle();
-  if (error) {
-    console.log("[getGuestReaction] error", postId, error.message);
-    return null;
-  }
-  if (!data) return null;
-  return String((data as Record<string, unknown>).reaction_type) as ReactionType;
-}
 
-/** Fetch guest reactions for multiple posts at once — mirrors getMyReactions for logged-in users. */
-export async function getGuestReactions(
-  postIds: string[],
-  guestId: string,
-): Promise<Record<string, ReactionType>> {
-  if (postIds.length === 0) return {};
-  const { data, error } = await supabase
-    .from("reactions")
-    .select("post_id, reaction_type")
-    .eq("guest_id", guestId)
-    .is("user_id", null)
-    .in("post_id", postIds);
-  if (error) return {};
-  const map: Record<string, ReactionType> = {};
-  (data ?? []).forEach((r: Record<string, unknown>) => {
-    map[String(r.post_id)] = String(r.reaction_type) as ReactionType;
-  });
-  return map;
-}
 
 // ─── Fire (Likes) ────────────────────────────────────────────────────────
 // Direct table operations on the `post_likes` table — no RPC needed.
 // The Fire button is TryIt's signature like: tap to toggle a 🔥 on any post.
 
-/** Toggle fire on/off for a post. Returns the updated like count. */
+/** Toggle fire on/off for a post. Requires auth. Returns the updated like count. */
 export async function toggleFire(
   postId: string,
-  userId: string | null,
-  guestId: string,
+  userId: string,
 ): Promise<number> {
-  // Check if already fired
-  let alreadyFired = false;
-  if (userId) {
-    const { data, error } = await supabase
-      .from("post_likes")
-      .select("id")
-      .eq("post_id", postId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (error) {
-      console.log("[toggleFire] check error", postId, error.message);
-      throw error;
-    }
-    alreadyFired = !!data;
-  } else {
-    const { data, error } = await supabase
-      .from("post_likes")
-      .select("id")
-      .eq("post_id", postId)
-      .eq("guest_id", guestId)
-      .is("user_id", null)
-      .maybeSingle();
-    if (error) {
-      console.log("[toggleFire] check error", postId, error.message);
-      throw error;
-    }
-    alreadyFired = !!data;
+  const { data, error } = await supabase
+    .from("post_likes")
+    .select("id")
+    .eq("post_id", postId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    console.log("[toggleFire] check error", postId, error.message);
+    throw error;
   }
+  const alreadyFired = !!data;
 
   if (alreadyFired) {
-    // Unfire — delete the row
-    if (userId) {
-      const { error } = await supabase
-        .from("post_likes")
-        .delete()
-        .eq("post_id", postId)
-        .eq("user_id", userId);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from("post_likes")
-        .delete()
-        .eq("post_id", postId)
-        .eq("guest_id", guestId)
-        .is("user_id", null);
-      if (error) throw error;
-    }
+    const { error } = await supabase
+      .from("post_likes")
+      .delete()
+      .eq("post_id", postId)
+      .eq("user_id", userId);
+    if (error) throw error;
   } else {
-    // Fire — insert a new row
-    const row: Record<string, unknown> = {
+    const { error } = await supabase.from("post_likes").insert({
       post_id: postId,
       type: "fire",
-    };
-    if (userId) {
-      row.user_id = userId;
-      row.guest_id = null;
-    } else {
-      row.guest_id = guestId;
-      row.user_id = null;
-    }
-    const { error } = await supabase.from("post_likes").insert(row);
+      user_id: userId,
+    });
     if (error) {
       console.log("[toggleFire] insert error", postId, error.message);
       throw error;
@@ -423,24 +329,20 @@ export async function toggleFire(
       if (post && post.user_id) {
         const postOwnerId = String(post.user_id);
         let actorName = "Someone";
-        if (userId) {
-          const { data: profile } = await supabase
-            .from("user_profiles")
-            .select("display_name, username")
-            .eq("id", userId)
-            .maybeSingle();
-          if (profile) {
-            actorName = String(profile.display_name || profile.username || "Someone");
-          }
-        } else {
-          actorName = "A guest";
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("display_name, username")
+          .eq("id", userId)
+          .maybeSingle();
+        if (profile) {
+          actorName = String(profile.display_name || profile.username || "Someone");
         }
         const postTitle = String(post.title ?? "your post");
         const snippet = postTitle.length > 30 ? postTitle.slice(0, 30) + "..." : postTitle;
         await createNotification({
           recipientId: postOwnerId,
           actorId: userId,
-          actorGuestId: userId ? null : guestId,
+          actorGuestId: null,
           postId,
           type: "fire",
           message: `${actorName} fired your "${snippet}"`,
@@ -451,9 +353,7 @@ export async function toggleFire(
     }
   }
 
-  // Return fresh count
   const count = await getFireCount(postId);
-  console.log("[toggleFire] done", postId, "fired=" + !alreadyFired, "count=" + count);
   return count;
 }
 
@@ -508,44 +408,16 @@ export async function getMyFires(
   return new Set((data ?? []).map((r: Record<string, unknown>) => String(r.post_id)));
 }
 
-/** Check which posts a guest has fired. */
-export async function getGuestFires(
-  postIds: string[],
-  guestId: string,
-): Promise<Set<string>> {
-  if (postIds.length === 0) return new Set();
-  const { data, error } = await supabase
-    .from("post_likes")
-    .select("post_id")
-    .eq("guest_id", guestId)
-    .is("user_id", null)
-    .in("post_id", postIds);
-  if (error) return new Set();
-  return new Set((data ?? []).map((r: Record<string, unknown>) => String(r.post_id)));
-}
-
-/** Check if a single post is fired by the current user/guest. */
+/** Check if a single post is fired by the current user. Requires auth. */
 export async function isFired(
   postId: string,
-  userId: string | null,
-  guestId: string,
+  userId: string,
 ): Promise<boolean> {
-  if (userId) {
-    const { data, error } = await supabase
-      .from("post_likes")
-      .select("id")
-      .eq("post_id", postId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (error) return false;
-    return !!data;
-  }
   const { data, error } = await supabase
     .from("post_likes")
     .select("id")
     .eq("post_id", postId)
-    .eq("guest_id", guestId)
-    .is("user_id", null)
+    .eq("user_id", userId)
     .maybeSingle();
   if (error) return false;
   return !!data;
@@ -1465,41 +1337,11 @@ export async function deleteAccount(userId: string): Promise<void> {
 }
 
 // ─── Guest → User Migration ───────────────────────────────────────────────
+// Guest voting has been removed — all voting now requires authentication.
+// The migration helper is kept as a no-op for backwards compatibility with
+// the AuthProvider, which may still call it on login.
 
-/**
- * Fetch guest reactions for migration. Re-reads the reactions table via
- * the guest_id column so we can re-submit them as user reactions on login.
- */
-export async function getGuestReactionsForMigration(
-  guestId: string,
-): Promise<Array<{ post_id: string; reaction_type: ReactionType }>> {
-  const { data, error } = await supabase
-    .from("reactions")
-    .select("post_id, reaction_type")
-    .eq("guest_id", guestId)
-    .is("user_id", null);
-  if (error) return [];
-  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-    post_id: String(r.post_id),
-    reaction_type: String(r.reaction_type) as ReactionType,
-  }));
-}
-
-/**
- * Migrate guest reactions to the logged-in user by re-calling upsert_reaction
- * for each. The RPC handles the upsert so duplicates are merged, and RLS
- * allows the authenticated user to delete their old guest rows.
- */
-export async function migrateGuestData(guestId: string, userId: string): Promise<number> {
-  const guestReactions = await getGuestReactionsForMigration(guestId);
-  let migrated = 0;
-  for (const r of guestReactions) {
-    try {
-      await upsertReaction(r.post_id, r.reaction_type, userId, guestId);
-      migrated++;
-    } catch (e) {
-      console.log("[migration] reaction failed", r.post_id, e);
-    }
-  }
-  return migrated;
+/** No-op: guest reactions are no longer migrated since voting requires auth. */
+export async function migrateGuestData(_guestId: string, _userId: string): Promise<number> {
+  return 0;
 }

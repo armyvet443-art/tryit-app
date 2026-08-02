@@ -35,7 +35,7 @@ import { formatCount } from "@/utils/format";
 type SearchMode = "posts" | "users";
 
 export default function ExploreScreen() {
-  const { userId, guestId } = useAuth();
+  const { userId } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState<string>("");
@@ -47,8 +47,8 @@ export default function ExploreScreen() {
 
   // Fetch blocked user IDs to filter them from explore results.
   const blockedQuery = useQuery<Set<string>>({
-    queryKey: ["blockedIds", userId, guestId],
-    queryFn: () => getBlockedUserIds(userId, guestId),
+    queryKey: ["blockedIds", userId],
+    queryFn: () => getBlockedUserIds(userId, ""),
     staleTime: 30_000,
   });
 
