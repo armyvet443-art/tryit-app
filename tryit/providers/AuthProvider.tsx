@@ -1,6 +1,7 @@
 import createContextHook from "@nkzw/create-context-hook";
 import type { Session } from "@supabase/supabase-js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Linking from "expo-linking";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/lib/supabase";
@@ -87,6 +88,20 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     if (error) throw error;
   }, []);
 
+  const sendPasswordReset = useCallback(async (email: string) => {
+    const redirectTo = Linking.createURL("/auth/update-password");
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim(),
+      { redirectTo },
+    );
+    if (error) throw error;
+  }, []);
+
+  const updatePassword = useCallback(async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  }, []);
+
   const signUp = useCallback(
     async (email: string, password: string, username: string, displayName: string) => {
       const { error } = await supabase.auth.signUp({
@@ -123,6 +138,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       isProfileLoading: profileQuery.isLoading,
       signIn,
       signInWithMagicLink,
+      sendPasswordReset,
+      updatePassword,
       signUp,
       signOut,
       refreshProfile,
@@ -136,6 +153,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       profileQuery.isLoading,
       signIn,
       signInWithMagicLink,
+      sendPasswordReset,
+      updatePassword,
       signUp,
       signOut,
       refreshProfile,

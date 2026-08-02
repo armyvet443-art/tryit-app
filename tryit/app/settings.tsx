@@ -22,7 +22,6 @@ import {
 } from "react-native";
 
 import Colors from "@/constants/colors";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/providers/AuthProvider";
 import { deleteAccount } from "@/services/tryit-service";
 
@@ -44,15 +43,18 @@ function SettingsRow({ icon, label, onPress, destructive = false }: RowProps) {
 }
 
 export default function SettingsScreen() {
-  const { userId, profile, signOut } = useAuth();
+  const { userId, profile, signOut, sendPasswordReset } = useAuth();
   const router = useRouter();
   const [busy, setBusy] = useState<boolean>(false);
 
   const handleChangePassword = async () => {
     if (!profile?.email) return;
     try {
-      await supabase.auth.resetPasswordForEmail(profile.email);
-      Alert.alert("Email sent 📬", "Check your inbox for a password reset link.");
+      await sendPasswordReset(profile.email);
+      Alert.alert(
+        "Email sent 📬",
+        "Check your inbox for a password reset link. Tap the link to set a new password.",
+      );
     } catch {
       Alert.alert("Error", "Could not send the reset email. Try again later.");
     }

@@ -35,6 +35,8 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="auth/login" options={{ title: "Log In", presentation: "modal" }} />
       <Stack.Screen name="auth/signup" options={{ title: "Sign Up", presentation: "modal" }} />
+      <Stack.Screen name="auth/forgot-password" options={{ title: "Reset Password", presentation: "modal" }} />
+      <Stack.Screen name="auth/update-password" options={{ title: "New Password", presentation: "fullScreenModal" }} />
       <Stack.Screen name="post/[id]" options={{ title: "Post" }} />
       <Stack.Screen name="user/[id]" options={{ title: "Profile" }} />
       <Stack.Screen name="messages/index" options={{ title: "Messages" }} />
