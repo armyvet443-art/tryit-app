@@ -1,7 +1,6 @@
 import "react-native-url-polyfill/auto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
-import { Platform } from "react-native";
 
 /**
  * Existing TryIt Supabase project (same backend as the original app).
@@ -23,8 +22,6 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     storage: AsyncStorage,
     autoRefreshToken: false,
     persistSession: true,
-    // On web, Supabase needs to detect the access_token/refresh_token from the
-    // redirect URL hash after a password-reset email link is clicked.
-    detectSessionInUrl: Platform.OS === "web",
+    detectSessionInUrl: false,
   },
 });

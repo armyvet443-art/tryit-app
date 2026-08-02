@@ -15,19 +15,6 @@ import {
 } from "react-native";
 import { CheckCircle2, KeyRound, Lock } from "lucide-react-native";
 
-/**
- * On web, get the full URL including hash fragment.
- * expo-linking's getInitialURL may not include the hash on web.
- */
-function getWebUrl(): string | null {
-  if (Platform.OS !== "web") return null;
-  try {
-    return window.location.href;
-  } catch {
-    return null;
-  }
-}
-
 import Colors from "@/constants/colors";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/providers/AuthProvider";
@@ -85,22 +72,10 @@ export default function UpdatePasswordScreen() {
 
   /** Parse the deep-link URL, extract tokens, and establish a recovery session. */
   const handleUrl = useCallback(async (url: string | null) => {
-    // On web with detectSessionInUrl:true, Supabase may have already
-    // established a session from the URL hash. Check that first.
-    const checkSession = async (retries = 3): Promise<boolean> => {
-      for (let i = 0; i < retries; i++) {
-        const { data } = await supabase.auth.getSession();
-        if (data.session) return true;
-        // Wait 200ms before retrying — Supabase's detectSessionInUrl is async
-        if (i < retries - 1) await new Promise((r) => setTimeout(r, 200));
-      }
-      return false;
-    };
-
     if (!url) {
-      // No URL — maybe user already has a valid session
-      const hasSession = await checkSession();
-      if (hasSession) {
+      // No URL — maybe user already has a valid session (e.g. web with detectSessionInUrl)
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
         setVerifying(false);
         return;
       }
@@ -112,8 +87,8 @@ export default function UpdatePasswordScreen() {
     const tokens = extractTokens(url);
     if (!tokens) {
       // Maybe session was already established by Supabase (web flow)
-      const hasSession = await checkSession();
-      if (hasSession) {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
         setVerifying(false);
         return;
       }
@@ -137,10 +112,6 @@ export default function UpdatePasswordScreen() {
   }, []);
 
   useEffect(() => {
-    // On web, the browser URL may contain the hash fragment with tokens.
-    // On native, expo-linking gives us the deep-link URL.
-    const webUrl = getWebUrl();
-
     // Build the full URL from search params (expo-router gives us the parsed params)
     const urlFromParams = Object.keys(searchParams).length > 0
       ? `${Linking.createURL("/auth/update-password")}?${new URLSearchParams(
@@ -148,22 +119,15 @@ export default function UpdatePasswordScreen() {
         ).toString()}`
       : null;
 
-    // On web, prefer the browser URL (includes hash fragment with tokens).
-    // On native, use getInitialURL (deep-link).
-    if (webUrl) {
-      handleUrl(webUrl);
-    } else {
-      Linking.getInitialURL().then((initialUrl) => {
-        handleUrl(initialUrl ?? urlFromParams);
-      });
-    }
+    // Try initial URL first
+    Linking.getInitialURL().then((initialUrl) => {
+      handleUrl(initialUrl ?? urlFromParams);
+    });
 
-    // Listen for URL events (app already open — native only)
-    const sub = Platform.OS !== "web"
-      ? Linking.addEventListener("url", ({ url }) => {
-          handleUrl(url);
-        })
-      : { remove: () => {} };
+    // Listen for URL events (app already open)
+    const sub = Linking.addEventListener("url", ({ url }) => {
+      handleUrl(url);
+    });
 
     return () => sub.remove();
   }, [handleUrl, searchParams]);

@@ -2,7 +2,6 @@ import createContextHook from "@nkzw/create-context-hook";
 import type { Session } from "@supabase/supabase-js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
-import { Platform } from "react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/lib/supabase";
@@ -90,13 +89,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   }, []);
 
   const sendPasswordReset = useCallback(async (email: string) => {
-    // On web, the redirect URL must be an absolute URL that Supabase can
-    // redirect to in the browser. On native, use the app's deep-link scheme.
-    const redirectTo =
-      Platform.OS === "web"
-        ? `${window.location.origin}/auth/update-password`
-        : Linking.createURL("/auth/update-password");
-    console.log("[auth] password reset redirectTo:", redirectTo);
+    const redirectTo = Linking.createURL("/auth/update-password");
     const { error } = await supabase.auth.resetPasswordForEmail(
       email.trim(),
       { redirectTo },
