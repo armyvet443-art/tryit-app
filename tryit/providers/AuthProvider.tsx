@@ -2,6 +2,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import type { Session } from "@supabase/supabase-js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
+import { Platform } from "react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/lib/supabase";
@@ -89,7 +90,16 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   }, []);
 
   const sendPasswordReset = useCallback(async (email: string) => {
-    const redirectTo = Linking.createURL("/auth/update-password");
+    // Platform-aware redirect URL so the reset email link actually resolves:
+    //  - Web (Rork preview): use the published app URL, not the app.json origin
+    //    (origin is https://rork.com/ which 404s — the real app is at the subdomain)
+    //  - Native (TestFlight): use the deep-link scheme rork-app:// which opens
+    //    the app directly; +native-intent.tsx routes it to /auth/update-password
+    const redirectTo =
+      Platform.OS === "web"
+        ? "https://tryit-rn-migration.rork.app/auth/update-password"
+        : Linking.createURL("/auth/update-password");
+    console.log("[auth] password reset redirectTo:", redirectTo);
     const { error } = await supabase.auth.resetPasswordForEmail(
       email.trim(),
       { redirectTo },

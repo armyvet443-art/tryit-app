@@ -10,7 +10,9 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  View,
 } from "react-native";
+import { Eye, EyeOff } from "lucide-react-native";
 
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
@@ -23,6 +25,7 @@ export default function SignupScreen() {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [busy, setBusy] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
 
   const handleSignup = async () => {
     if (!displayName.trim() || !username.trim() || !email.trim() || password.length < 6) {
@@ -79,14 +82,28 @@ export default function SignupScreen() {
           autoCapitalize="none"
           keyboardType="email-address"
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Password (6+ characters)"
-          placeholderTextColor={Colors.inactiveIcon}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+        <View style={styles.passwordWrap}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Password (6+ characters)"
+            placeholderTextColor={Colors.inactiveIcon}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowPassword((s) => !s)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            {showPassword ? (
+              <EyeOff size={20} color={Colors.mutedText} />
+            ) : (
+              <Eye size={20} color={Colors.mutedText} />
+            )}
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           testID="signup-submit"
@@ -157,6 +174,25 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "800" as const,
+  },
+  passwordWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.softGray,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    color: Colors.text,
+    fontSize: 15,
+  },
+  eyeButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 13,
   },
   linkText: {
     color: Colors.mutedText,

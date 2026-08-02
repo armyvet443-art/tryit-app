@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { CheckCircle2, KeyRound, Lock } from "lucide-react-native";
+import { CheckCircle2, Eye, EyeOff, KeyRound, Lock } from "lucide-react-native";
 
 import Colors from "@/constants/colors";
 import { supabase } from "@/lib/supabase";
@@ -69,6 +69,8 @@ export default function UpdatePasswordScreen() {
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [busy, setBusy] = useState<boolean>(false);
   const [done, setDone] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showConfirm, setShowConfirm] = useState<boolean>(false);
 
   /** Parse the deep-link URL, extract tokens, and establish a recovery session. */
   const handleUrl = useCallback(async (url: string | null) => {
@@ -225,24 +227,50 @@ export default function UpdatePasswordScreen() {
           Enter a new password for your TryIt account.
         </Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="New password (6+ characters)"
-          placeholderTextColor={Colors.inactiveIcon}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoComplete="new-password"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Confirm new password"
-          placeholderTextColor={Colors.inactiveIcon}
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-          autoComplete="new-password"
-        />
+        <View style={styles.passwordWrap}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="New password (6+ characters)"
+            placeholderTextColor={Colors.inactiveIcon}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            autoComplete="new-password"
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowPassword((s) => !s)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            {showPassword ? (
+              <EyeOff size={20} color={Colors.mutedText} />
+            ) : (
+              <Eye size={20} color={Colors.mutedText} />
+            )}
+          </TouchableOpacity>
+        </View>
+        <View style={styles.passwordWrap}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Confirm new password"
+            placeholderTextColor={Colors.inactiveIcon}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry={!showConfirm}
+            autoComplete="new-password"
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowConfirm((s) => !s)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            {showConfirm ? (
+              <EyeOff size={20} color={Colors.mutedText} />
+            ) : (
+              <Eye size={20} color={Colors.mutedText} />
+            )}
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           testID="update-password-submit"
@@ -305,6 +333,25 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     color: Colors.text,
     fontSize: 15,
+  },
+  passwordWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.softGray,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    color: Colors.text,
+    fontSize: 15,
+  },
+  eyeButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 13,
   },
   primaryButton: {
     backgroundColor: Colors.flameOrange,
