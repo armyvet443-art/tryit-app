@@ -199,6 +199,17 @@ async function deleteExistingReaction(postId: string, userId: string): Promise<v
 /**
  * Set or toggle a reaction. Pass `null` as `reaction` to un-react.
  * Requires authentication — guests cannot vote.
+ *
+ * Uses UPDATE-or-INSERT instead of DELETE-then-INSERT to avoid the flicker
+ * (1 → 0) that occurred when changing reaction type (e.g. Maybe → Must Try).
+ * The old approach deleted the row first, creating a window where the row was
+ * missing — the INSERT then failed on the unique (post_id, user_id) constraint
+ * or a realtime event fired during the gap, reverting the count to 0.
+ *
+ * UPDATE-or-INSERT avoids this entirely: if a row exists it's updated in a
+ * single operation (no missing-row window); if not, a new row is inserted.
+ * This works regardless of whether the unique index is partial or full.
+ *
  * Returns the fresh counts read from the reactions table so callers can render
  * the result without an extra fetch and without flicker.
  */
@@ -207,16 +218,32 @@ export async function upsertReaction(
   reaction: ReactionType | null,
   userId: string,
 ): Promise<ReactionCounts> {
-  await deleteExistingReaction(postId, userId);
-  if (reaction) {
-    const { error } = await supabase.from("reactions").insert({
-      post_id: postId,
-      reaction_type: reaction,
-      user_id: userId,
-    });
-    if (error) {
-      console.log("[upsertReaction] insert error", postId, error.message);
-      throw error;
+  if (!reaction) {
+    // Toggle off — delete the existing row.
+    await deleteExistingReaction(postId, userId);
+  } else {
+    // Try UPDATE first — no missing-row window, no flicker.
+    const { data: updated, error: updateError } = await supabase
+      .from("reactions")
+      .update({ reaction_type: reaction })
+      .eq("post_id", postId)
+      .eq("user_id", userId)
+      .select();
+    if (updateError) {
+      console.log("[upsertReaction] update error", postId, updateError.message);
+      throw updateError;
+    }
+    // If no existing row was updated, this is a first-time vote — INSERT.
+    if (!updated || updated.length === 0) {
+      const { error: insertError } = await supabase.from("reactions").insert({
+        post_id: postId,
+        reaction_type: reaction,
+        user_id: userId,
+      });
+      if (insertError) {
+        console.log("[upsertReaction] insert error", postId, insertError.message);
+        throw insertError;
+      }
     }
   }
   const counts = await countReactions(postId);

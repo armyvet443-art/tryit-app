@@ -127,7 +127,10 @@ export default function PostDetailScreen() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reactions", filter: `post_id=eq.${postId}` },
-        () => queryClient.invalidateQueries({ queryKey: ["post", postId] }),
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["reactionCounts", postId] });
+          queryClient.invalidateQueries({ queryKey: ["myReaction", userId, postId] });
+        },
       )
       .subscribe();
 
@@ -382,6 +385,10 @@ export default function PostDetailScreen() {
 
   const handleShare = useCallback(async () => {
     if (!post) return;
+    if (!userId) {
+      setShowLoginModal(true);
+      return;
+    }
     const link = `https://tryit-rn-migration.rork.app/post/${post.id}`;
     try {
       if (Share.share) {
