@@ -93,6 +93,7 @@ export default function PostDetailScreen() {
   const [isReporting, setIsReporting] = useState<boolean>(false);
   const [isBlocking, setIsBlocking] = useState<boolean>(false);
   const fireScale = React.useRef(new Animated.Value(1)).current;
+  const reactionScale = React.useRef(new Animated.Value(1)).current;
 
   const postQuery = useQuery<TryPost | null>({
     queryKey: ["post", postId],
@@ -243,6 +244,15 @@ export default function PostDetailScreen() {
       if (nextReaction) nextCounts[nextReaction] = nextCounts[nextReaction] + 1;
       setReaction(nextReaction);
       setCounts(nextCounts);
+      if (nextReaction) {
+        reactionScale.setValue(0.8);
+        Animated.spring(reactionScale, {
+          toValue: 1,
+          friction: 3,
+          tension: 50,
+          useNativeDriver: true,
+        }).start();
+      }
       try {
         console.log("[PostDetail.handleReact] calling upsertReaction", { postId, nextReaction, userId, isOwnPost: post?.user_id === userId });
         const freshCounts = await upsertReaction(postId, nextReaction, userId);
@@ -630,6 +640,7 @@ export default function PostDetailScreen() {
                 ]}
                 onPress={() => handleReact(type)}
               >
+              <Animated.View style={{ transform: [{ scale: selected ? reactionScale : 1 }] }}>
                 <Text style={styles.reactionEmoji}>{meta.emoji}</Text>
                 <Text style={[styles.reactionLabel, selected && { color }]} numberOfLines={1}>
                   {meta.label}
@@ -637,7 +648,8 @@ export default function PostDetailScreen() {
                 <Text style={[styles.reactionCount, selected && { color }]}>
                   {formatCount(counts[type])}
                 </Text>
-              </TouchableOpacity>
+              </Animated.View>
+            </TouchableOpacity>
             );
           })}
         </View>

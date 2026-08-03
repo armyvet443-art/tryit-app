@@ -102,6 +102,7 @@ export default function PostCard({
   const [isFired, setIsFired] = useState<boolean>(fired);
   const [fireCountState, setFireCountState] = useState<number>(fireCount);
   const fireScale = React.useRef(new Animated.Value(1)).current;
+  const reactionScale = React.useRef(new Animated.Value(1)).current;
 
   useEffect(() => setReaction(myReaction), [myReaction]);
   useEffect(() => setIsTried(tried), [tried]);
@@ -133,6 +134,15 @@ export default function PostCard({
       if (nextReaction) nextCounts[nextReaction] = nextCounts[nextReaction] + 1;
       setReaction(nextReaction);
       setCounts(nextCounts);
+      if (nextReaction) {
+        reactionScale.setValue(0.8);
+        Animated.spring(reactionScale, {
+          toValue: 1,
+          friction: 3,
+          tension: 50,
+          useNativeDriver: true,
+        }).start();
+      }
       try {
         console.log("[PostCard.handleReact] calling upsertReaction", { postId: post.id, nextReaction, userId, isOwnPost: post.user_id === userId });
         const freshCounts = await upsertReaction(post.id, nextReaction, userId);
@@ -484,13 +494,15 @@ export default function PostCard({
               ]}
               onPress={() => handleReact(type)}
             >
-              <Text style={styles.reactionEmoji}>{meta.emoji}</Text>
-              <Text style={[styles.reactionLabel, selected && { color }]} numberOfLines={1}>
-                {meta.label}
-              </Text>
-              <Text style={[styles.reactionCount, selected && { color }]}>
-                {formatCount(counts[type])}
-              </Text>
+              <Animated.View style={{ transform: [{ scale: selected ? reactionScale : 1 }] }}>
+                <Text style={styles.reactionEmoji}>{meta.emoji}</Text>
+                <Text style={[styles.reactionLabel, selected && { color }]} numberOfLines={1}>
+                  {meta.label}
+                </Text>
+                <Text style={[styles.reactionCount, selected && { color }]}>
+                  {formatCount(counts[type])}
+                </Text>
+              </Animated.View>
             </TouchableOpacity>
           );
         })}
