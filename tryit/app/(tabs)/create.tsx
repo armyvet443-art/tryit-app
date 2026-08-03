@@ -3,7 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import * as FileSystem from "expo-file-system";
 import { useRouter } from "expo-router";
-import { Camera, ImageIcon, ImagePlus, Video as VideoIcon, X } from "lucide-react-native";
+import { Camera, Crop, ImageIcon, ImagePlus, Video as VideoIcon, X } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -76,9 +76,27 @@ export default function CreateScreen() {
     }
   };
 
+  const recropPhoto = async () => {
+    if (!photoUri) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.7,
+      base64: true,
+      allowsEditing: true,
+      aspect: [4, 3],
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      const asset = result.assets[0];
+      setPhotoLoadFailed(false);
+      setPhotoUri(asset.uri);
+      setPhotoBase64(asset.base64 ?? null);
+    }
+  };
+
   const pickVideo = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["videos"],
+      allowsEditing: true,
       videoQuality: ImagePicker.UIImagePickerControllerQualityType.Low,
       videoExportPreset: ImagePicker.VideoExportPreset.LowQuality,
     });
@@ -252,6 +270,9 @@ export default function CreateScreen() {
                 ) : null}
                 <TouchableOpacity style={styles.removeBtn} onPress={removePhoto} testID="remove-photo">
                   <X size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.editBtn} onPress={recropPhoto} testID="recrop-photo">
+                  <Crop size={14} color="#FFFFFF" />
                 </TouchableOpacity>
                 <View style={styles.slotBadge}>
                   <ImageIcon size={12} color="#FFFFFF" />
@@ -529,6 +550,17 @@ const styles = StyleSheet.create({
     color: Colors.error,
     fontSize: 13,
     fontWeight: "700" as const,
+  },
+  editBtn: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,106,0,0.85)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   collageHint: {
     color: Colors.flameOrange,
