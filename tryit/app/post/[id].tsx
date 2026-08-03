@@ -254,12 +254,10 @@ export default function PostDetailScreen() {
         }).start();
       }
       try {
-        console.log("[PostDetail.handleReact] calling upsertReaction", { postId, nextReaction, userId, isOwnPost: post?.user_id === userId });
         const freshCounts = await upsertReaction(postId, nextReaction, userId);
-        console.log("[PostDetail.handleReact] upsertReaction returned", { postId, freshCounts });
         setCounts(freshCounts);
       } catch (e) {
-        console.log("[PostDetail.handleReact] upsert FAILED", { postId, reaction: nextReaction, userId, error: e });
+        console.log("[PostDetail.handleReact] upsert failed", e);
         setReaction(previous);
         setCounts(counts);
       }

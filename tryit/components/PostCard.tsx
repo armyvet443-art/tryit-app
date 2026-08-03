@@ -144,13 +144,10 @@ export default function PostCard({
         }).start();
       }
       try {
-        console.log("[PostCard.handleReact] calling upsertReaction", { postId: post.id, nextReaction, userId, isOwnPost: post.user_id === userId });
         const freshCounts = await upsertReaction(post.id, nextReaction, userId);
-        console.log("[PostCard.handleReact] upsertReaction returned", { postId: post.id, freshCounts });
         setCounts(freshCounts);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.log("[PostCard.handleReact] upsert FAILED", { postId: post.id, reaction: nextReaction, userId, error: msg, fullError: e });
+        console.log("[PostCard.handleReact] upsert failed", e);
         setReaction(previous);
         setCounts(counts);
       }
@@ -158,12 +155,7 @@ export default function PostCard({
     [reaction, counts, post.id, userId],
   );
 
-  // Debug: log when realtime or query invalidation changes counts
-  useEffect(() => {
-    if (reactionCounts) {
-      console.log("[PostCard] reactionCounts prop changed (realtime/query)", { postId: post.id, reactionCounts, currentLocal: counts });
-    }
-  }, [reactionCounts]);
+
 
   const handleTried = useCallback(async () => {
     if (!userId) {
