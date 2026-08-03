@@ -127,7 +127,8 @@ export default function PostDetailScreen() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reactions", filter: `post_id=eq.${postId}` },
-        () => {
+        (payload) => {
+          console.log("[PostDetail] REALTIME reactions event", { postId, eventType: payload.eventType, new: payload.new, old: payload.old });
           queryClient.invalidateQueries({ queryKey: ["reactionCounts", postId] });
           queryClient.invalidateQueries({ queryKey: ["myReaction", userId, postId] });
         },
@@ -211,7 +212,10 @@ export default function PostDetailScreen() {
   }, [fireQuery.data]);
 
   useEffect(() => {
-    if (countsQuery.data) setCounts(countsQuery.data);
+    if (countsQuery.data) {
+      console.log("[PostDetail] countsQuery.data updated (realtime/refetch)", { postId, counts: countsQuery.data, currentLocal: counts });
+      setCounts(countsQuery.data);
+    }
   }, [countsQuery.data]);
 
   useEffect(() => {
@@ -240,10 +244,12 @@ export default function PostDetailScreen() {
       setReaction(nextReaction);
       setCounts(nextCounts);
       try {
+        console.log("[PostDetail.handleReact] calling upsertReaction", { postId, nextReaction, userId, isOwnPost: post?.user_id === userId });
         const freshCounts = await upsertReaction(postId, nextReaction, userId);
+        console.log("[PostDetail.handleReact] upsertReaction returned", { postId, freshCounts });
         setCounts(freshCounts);
       } catch (e) {
-        console.log("[reaction] upsert failed", e);
+        console.log("[PostDetail.handleReact] upsert FAILED", { postId, reaction: nextReaction, userId, error: e });
         setReaction(previous);
         setCounts(counts);
       }

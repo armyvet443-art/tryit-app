@@ -188,11 +188,13 @@ async function countReactions(postId: string): Promise<ReactionCounts> {
 
 /** Delete the existing reaction row for this user on the given post. Requires auth. */
 async function deleteExistingReaction(postId: string, userId: string): Promise<void> {
-  const { error } = await supabase
+  console.log("[deleteReaction] START", { postId, userId });
+  const { error, count } = await supabase
     .from("reactions")
-    .delete()
+    .delete({ count: "exact" })
     .eq("post_id", postId)
     .eq("user_id", userId);
+  console.log("[deleteReaction] result", { postId, userId, count, error: error ? { code: error.code, message: error.message, details: error.details, hint: error.hint } : null });
   if (error) throw error;
 }
 
@@ -218,6 +220,8 @@ export async function upsertReaction(
   reaction: ReactionType | null,
   userId: string,
 ): Promise<ReactionCounts> {
+  console.log("[upsertReaction] START", { postId, reaction, userId });
+
   if (!reaction) {
     // Toggle off — delete the existing row.
     await deleteExistingReaction(postId, userId);
@@ -229,24 +233,69 @@ export async function upsertReaction(
       .eq("post_id", postId)
       .eq("user_id", userId)
       .select();
+    console.log("[upsertReaction] UPDATE result", {
+      postId,
+      reaction,
+      userId,
+      updatedRows: updated ? updated.length : 0,
+      updatedData: updated,
+      error: updateError
+        ? { code: updateError.code, message: updateError.message, details: updateError.details, hint: updateError.hint }
+        : null,
+    });
     if (updateError) {
-      console.log("[upsertReaction] update error", postId, updateError.message);
       throw updateError;
     }
     // If no existing row was updated, this is a first-time vote — INSERT.
     if (!updated || updated.length === 0) {
-      const { error: insertError } = await supabase.from("reactions").insert({
-        post_id: postId,
-        reaction_type: reaction,
-        user_id: userId,
+      console.log("[upsertReaction] no row updated, attempting INSERT", { postId, reaction, userId });
+      const { data: inserted, error: insertError } = await supabase
+        .from("reactions")
+        .insert({
+          post_id: postId,
+          reaction_type: reaction,
+          user_id: userId,
+        })
+        .select();
+      console.log("[upsertReaction] INSERT result", {
+        postId,
+        reaction,
+        userId,
+        insertedData: inserted,
+        error: insertError
+          ? { code: insertError.code, message: insertError.message, details: insertError.details, hint: insertError.hint }
+          : null,
       });
       if (insertError) {
-        console.log("[upsertReaction] insert error", postId, insertError.message);
         throw insertError;
       }
+    } else {
+      console.log("[upsertReaction] row updated successfully, skipping INSERT", { postId, userId, rowsUpdated: updated.length });
     }
   }
-  const counts = await countReactions(postId);
+
+  // Read back fresh counts directly (inline so we can log the raw rows)
+  const { data: allReactions, error: countError } = await supabase
+    .from("reactions")
+    .select("reaction_type, user_id")
+    .eq("post_id", postId);
+  console.log("[upsertReaction] countReactions result", {
+    postId,
+    rowCount: allReactions ? allReactions.length : 0,
+    allReactions,
+    error: countError ? { code: countError.code, message: countError.message } : null,
+  });
+
+  if (countError) {
+    console.log("[upsertReaction] countReactions error", postId, countError.message);
+    return emptyCounts();
+  }
+  const counts = emptyCounts();
+  for (const r of (allReactions ?? []) as Record<string, unknown>[]) {
+    const t = String(r.reaction_type) as ReactionType;
+    if (t in counts) counts[t] += 1;
+  }
+  console.log("[upsertReaction] END", { postId, userId, finalCounts: counts });
   return counts;
 }
 
