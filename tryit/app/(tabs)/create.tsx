@@ -1,10 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
+import { useEventListener } from "expo";
 import { Image } from "expo-image";
+import { useVideoPlayer, VideoView } from "expo-video";
 import * as FileSystem from "expo-file-system";
 import { useRouter } from "expo-router";
-import { Camera, Crop, ImageIcon, ImagePlus, Video as VideoIcon, X } from "lucide-react-native";
-import React, { useState } from "react";
+import { Camera, Crop, ImageIcon, ImagePlus, Play, Video as VideoIcon, X } from "lucide-react-native";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +25,73 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { createPost, uploadPostMedia, uploadPostVideo } from "@/services/tryit-service";
 import { CATEGORIES } from "@/types/models";
+
+/**
+ * Video preview slot for the Create screen.
+ * Shows a play button overlay on the first frame; tapping plays the
+ * trimmed video inline so users can preview before posting.
+ */
+function VideoPreviewSlot({
+  uri,
+  playing,
+  onPlay,
+  onEnd,
+  onRemove,
+}: {
+  uri: string;
+  playing: boolean;
+  onPlay: () => void;
+  onEnd: () => void;
+  onRemove: () => void;
+}) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = false;
+    p.muted = false;
+  });
+
+  useEffect(() => {
+    if (playing) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [playing, player]);
+
+  // Show the play button again when playback ends
+  useEventListener(player, "playToEnd", () => {
+    onEnd();
+  });
+
+  return (
+    <View style={styles.mediaPreviewWrap}>
+      <VideoView
+        player={player}
+        style={styles.mediaPreview}
+        contentFit="cover"
+        nativeControls={false}
+        allowsFullscreen={false}
+        allowsPictureInPicture={false}
+      />
+      {!playing ? (
+        <TouchableOpacity
+          style={styles.playOverlayBtn}
+          onPress={onPlay}
+          activeOpacity={0.8}
+          testID="preview-video-play"
+        >
+          <Play size={32} color="#FFFFFF" fill="#FFFFFF" />
+        </TouchableOpacity>
+      ) : null}
+      <TouchableOpacity style={styles.removeBtn} onPress={onRemove} testID="remove-video">
+        <X size={16} color="#FFFFFF" />
+      </TouchableOpacity>
+      <View style={[styles.slotBadge, styles.slotBadgeVideo]}>
+        <VideoIcon size={12} color="#FFFFFF" />
+        <Text style={styles.slotBadgeText}>VIDEO</Text>
+      </View>
+    </View>
+  );
+}
 
 export default function CreateScreen() {
   const { userId } = useAuth();
@@ -45,6 +114,7 @@ export default function CreateScreen() {
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [videoExt, setVideoExt] = useState<string>("mp4");
 
+  const [videoPlaying, setVideoPlaying] = useState<boolean>(false);
   const [posting, setPosting] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [showCustomInput, setShowCustomInput] = useState<boolean>(false);
@@ -136,6 +206,7 @@ export default function CreateScreen() {
 
   const removeVideo = () => {
     setVideoUri(null);
+    setVideoPlaying(false);
   };
 
   const handlePost = async () => {
@@ -297,21 +368,13 @@ export default function CreateScreen() {
           {/* Video slot */}
           <View style={styles.mediaSlot}>
             {videoUri ? (
-              <View style={styles.mediaPreviewWrap}>
-                <Image
-                  source={{ uri: videoUri }}
-                  style={styles.mediaPreview}
-                  contentFit="cover"
-                  transition={200}
-                />
-                <TouchableOpacity style={styles.removeBtn} onPress={removeVideo} testID="remove-video">
-                  <X size={16} color="#FFFFFF" />
-                </TouchableOpacity>
-                <View style={[styles.slotBadge, styles.slotBadgeVideo]}>
-                  <VideoIcon size={12} color="#FFFFFF" />
-                  <Text style={styles.slotBadgeText}>VIDEO</Text>
-                </View>
-              </View>
+              <VideoPreviewSlot
+                uri={videoUri}
+                playing={videoPlaying}
+                onPlay={() => setVideoPlaying(true)}
+                onEnd={() => setVideoPlaying(false)}
+                onRemove={removeVideo}
+              />
             ) : (
               <TouchableOpacity
                 style={styles.mediaPlaceholder}
@@ -564,6 +627,16 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,106,0,0.85)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  playOverlayBtn: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(15,15,15,0.35)",
   },
   collageHint: {
     color: Colors.flameOrange,
