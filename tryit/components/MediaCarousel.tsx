@@ -85,6 +85,8 @@ export default function MediaCarousel({ items, onOpenDetail }: MediaCarouselProp
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const scrollRef = useRef<ScrollView>(null);
 
+  const validItems = items.filter((item) => typeof item.url === "string" && item.url.trim().length > 0);
+
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
@@ -99,13 +101,13 @@ export default function MediaCarousel({ items, onOpenDetail }: MediaCarouselProp
   }, [activeIndex]);
 
   const goNext = useCallback(() => {
-    const next = Math.min(items.length - 1, activeIndex + 1);
+    const next = Math.min(validItems.length - 1, activeIndex + 1);
     scrollRef.current?.scrollTo({ x: next * SCREEN_WIDTH, animated: true });
-  }, [activeIndex, items.length]);
+  }, [activeIndex, validItems.length]);
 
-  if (items.length === 0) return null;
-  if (items.length === 1) {
-    const item = items[0];
+  if (validItems.length === 0) return null;
+  if (validItems.length === 1) {
+    const item = validItems[0];
     return item.type === "video" ? (
       <VideoTile item={item} active />
     ) : (
@@ -124,7 +126,7 @@ export default function MediaCarousel({ items, onOpenDetail }: MediaCarouselProp
         scrollEventThrottle={16}
         style={styles.scroll}
       >
-        {items.map((item, i) =>
+        {validItems.map((item, i) =>
           item.type === "video" ? (
             <View key={item.url + i} style={styles.page}>
               <VideoTile item={item} active={i === activeIndex} />
@@ -142,21 +144,21 @@ export default function MediaCarousel({ items, onOpenDetail }: MediaCarouselProp
           <ChevronLeft size={20} color="#FFFFFF" />
         </TouchableOpacity>
       ) : null}
-      {activeIndex < items.length - 1 ? (
+      {activeIndex < validItems.length - 1 ? (
         <TouchableOpacity style={[styles.nav, styles.navRight]} onPress={goNext} testID="carousel-next">
           <ChevronRight size={20} color="#FFFFFF" />
         </TouchableOpacity>
       ) : null}
 
       <View style={styles.dots}>
-        {items.map((item, i) => (
+        {validItems.map((item, i) => (
           <View key={item.url + i} style={[styles.dot, i === activeIndex && styles.dotActive]} />
         ))}
       </View>
 
       <View style={styles.counter}>
         <Text style={styles.counterText}>
-          {activeIndex + 1} / {items.length}
+          {activeIndex + 1} / {validItems.length}
         </Text>
       </View>
     </View>

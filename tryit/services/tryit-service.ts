@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { decode } from "base64-arraybuffer";
+import * as VideoThumbnails from "expo-video-thumbnails";
 
 import { supabase } from "@/lib/supabase";
 import type {
@@ -1064,24 +1065,53 @@ export async function uploadPostMedia(base64: string, extension: string, userId:
 }
 
 /** Upload a video (file URI) to post-media storage. Uses fetch→Blob to avoid base64 memory issues. */
-export async function uploadPostVideo(uri: string, extension: string, userId: string): Promise<string> {
+export async function uploadPostVideo(
+  uri: string,
+  extension: string,
+  userId: string,
+): Promise<{ videoUrl: string; thumbnailUrl: string }> {
   const ext = extension.toLowerCase() === "mov" ? "mov" : "mp4";
   const contentType = ext === "mov" ? "video/quicktime" : "video/mp4";
-  const path = `${userId}/${Date.now()}.${ext}`;
-  console.log("[uploadPostVideo] uploading", { uri, ext, contentType, path });
+  const baseName = `${userId}/${Date.now()}`;
+  const videoPath = `${baseName}.${ext}`;
+  console.log("[uploadPostVideo] uploading", { uri, ext, contentType, path: videoPath });
   const response = await fetch(uri);
   const blob = await response.blob();
   console.log("[uploadPostVideo] blob size", blob.size, "type", blob.type);
   const { error } = await supabase.storage
     .from("post-media")
-    .upload(path, blob, { contentType, upsert: false });
+    .upload(videoPath, blob, { contentType, upsert: false });
   if (error) {
     console.log("[uploadPostVideo] upload error", error.message);
     throw error;
   }
-  const publicUrl = supabase.storage.from("post-media").getPublicUrl(path).data.publicUrl;
-  console.log("[uploadPostVideo] uploaded to", publicUrl);
-  return publicUrl;
+  const videoUrl = supabase.storage.from("post-media").getPublicUrl(videoPath).data.publicUrl;
+  console.log("[uploadPostVideo] uploaded to", videoUrl);
+
+  // Generate a thumbnail from the first frame and upload it alongside the video.
+  let thumbnailUrl = "";
+  try {
+    const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(uri, {
+      time: 0,
+      quality: 0.7,
+    });
+    const thumbResponse = await fetch(thumbUri);
+    const thumbBlob = await thumbResponse.blob();
+    const thumbPath = `${baseName}-thumb.jpg`;
+    const { error: thumbError } = await supabase.storage
+      .from("post-media")
+      .upload(thumbPath, thumbBlob, { contentType: "image/jpeg", upsert: false });
+    if (!thumbError) {
+      thumbnailUrl = supabase.storage.from("post-media").getPublicUrl(thumbPath).data.publicUrl;
+      console.log("[uploadPostVideo] thumbnail uploaded to", thumbnailUrl);
+    } else {
+      console.log("[uploadPostVideo] thumbnail upload error", thumbError.message);
+    }
+  } catch (e) {
+    console.log("[uploadPostVideo] thumbnail generation failed", e);
+  }
+
+  return { videoUrl, thumbnailUrl };
 }
 
 export async function uploadAvatar(base64: string, extension: string, userId: string): Promise<string> {
@@ -1117,23 +1147,25 @@ export async function createPost(input: {
   mediaType: "image" | "video";
   category: string;
   location: string;
+  /** Optional: thumbnail for video posts. */
+  thumbnailUrl?: string;
   /** Optional: multiple media items (photo + video collage). When provided,
    *  media_url is stored as a JSON array that parseMediaItems() can parse. */
-  mediaItems?: { url: string; type: "image" | "video" }[];
+  mediaItems?: { url: string; type: "image" | "video"; thumbnail?: string }[];
 }): Promise<void> {
   const hasMulti = input.mediaItems && input.mediaItems.length > 0;
-  const mediaUrlValue = hasMulti
-    ? JSON.stringify(input.mediaItems)
-    : input.mediaUrl;
-  const mediaTypeValue = hasMulti
-    ? input.mediaItems![0].type
-    : input.mediaType;
+  const mediaUrlValue = hasMulti ? JSON.stringify(input.mediaItems) : input.mediaUrl;
+  const mediaTypeValue = hasMulti ? input.mediaItems![0].type : input.mediaType;
+  const thumbnailUrlValue = hasMulti
+    ? input.mediaItems?.find((m) => m.type === "image")?.url ?? input.mediaItems?.[0]?.thumbnail ?? input.thumbnailUrl
+    : input.thumbnailUrl;
   const { error } = await supabase.from("posts").insert({
     user_id: input.userId,
     title: input.title,
     caption: input.caption,
     media_url: mediaUrlValue,
     media_type: mediaTypeValue,
+    thumbnail_url: thumbnailUrlValue ?? null,
     category: input.category,
     location: input.location,
   });

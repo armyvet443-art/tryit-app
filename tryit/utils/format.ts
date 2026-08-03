@@ -4,28 +4,36 @@ import type { MediaItem, TryPost } from "@/types/models";
  * Parse media items from a post. The TryIt posts table stores media_url as a
  * single string or a JSON array. We support both to avoid any backend change.
  */
+function isValidUrl(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 export function parseMediaItems(post: TryPost): MediaItem[] {
   const raw = post.media_url;
-  if (!raw) return [];
+  if (!isValidUrl(raw)) return [];
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.map((m) => {
-        if (typeof m === "string") {
-          return inferMediaItem(m, post.thumbnail_url);
-        }
-        return {
-          url: String(m.url ?? m.media_url ?? ""),
-          type: (m.type ?? m.media_type ?? "image") === "video" ? "video" : "image",
-          thumbnail: m.thumbnail ?? m.thumbnail_url ?? null,
-        };
-      });
+      return parsed
+        .map((m) => {
+          if (typeof m === "string") {
+            return isValidUrl(m) ? inferMediaItem(m, post.thumbnail_url) : null;
+          }
+          const url = String(m.url ?? m.media_url ?? "").trim();
+          if (url.length === 0) return null;
+          const type = (m.type ?? m.media_type ?? "image") === "video" ? "video" : "image";
+          return {
+            url,
+            type,
+            thumbnail: isValidUrl(m.thumbnail) ? m.thumbnail : isValidUrl(m.thumbnail_url) ? m.thumbnail_url : null,
+          } as MediaItem;
+        })
+        .filter((m): m is MediaItem => m !== null);
     }
   } catch {
     // not JSON — treat as single URL
   }
-  if (raw.length > 0) return [inferMediaItem(raw, post.thumbnail_url)];
-  return [];
+  return [inferMediaItem(raw, post.thumbnail_url)];
 }
 
 function inferMediaItem(url: string, thumbnail: string | null): MediaItem {
@@ -39,7 +47,7 @@ function inferMediaItem(url: string, thumbnail: string | null): MediaItem {
   return {
     url,
     type: isVideo ? "video" : "image",
-    thumbnail: isVideo ? thumbnail : null,
+    thumbnail: isVideo ? (isValidUrl(thumbnail) ? thumbnail : null) : null,
   };
 }
 

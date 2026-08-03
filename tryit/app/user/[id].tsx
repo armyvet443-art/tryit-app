@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { Grid3x3, MessageCircle } from "lucide-react-native";
+import { Grid3x3, MessageCircle, Play } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -27,7 +27,7 @@ import {
   getUserPosts,
 } from "@/services/tryit-service";
 import type { TryPost, UserProfile } from "@/types/models";
-import { formatCount } from "@/utils/format";
+import { formatCount, parseMediaItems } from "@/utils/format";
 
 type TabKey = "posts" | "tried";
 
@@ -195,27 +195,49 @@ export default function UserProfileScreen() {
         keyExtractor={(item) => item.id}
         numColumns={3}
         ListHeaderComponent={header}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={{ width: tileSize, height: tileSize, margin: 1 }}
-            onPress={() => router.push({ pathname: "/post/[id]", params: { id: item.id } })}
-          >
-            {item.media_url ? (
-              <Image
-                source={{ uri: item.thumbnail_url ?? item.media_url }}
-                style={styles.gridImage}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-              />
-            ) : (
-              <View style={[styles.gridImage, styles.gridPlaceholder]}>
-                <Text numberOfLines={3} style={styles.gridTitle}>
-                  {item.title}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        )}
+        renderItem={({ item }) => {
+          const mediaItems = parseMediaItems(item);
+          const firstItem = mediaItems[0];
+          const isVideo = firstItem?.type === "video";
+          const thumbUrl = firstItem?.thumbnail ?? firstItem?.url ?? item.thumbnail_url ?? item.media_url;
+          const hasThumb = typeof thumbUrl === "string" && thumbUrl.trim().length > 0;
+          return (
+            <TouchableOpacity
+              style={{ width: tileSize, height: tileSize, margin: 1 }}
+              onPress={() => router.push({ pathname: "/post/[id]", params: { id: item.id } })}
+            >
+              {hasThumb ? (
+                <>
+                  <Image
+                    source={{ uri: thumbUrl }}
+                    style={styles.gridImage}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                  />
+                  {isVideo ? (
+                    <View style={styles.gridVideoOverlay}>
+                      <View style={styles.gridPlayCircle}>
+                        <Play size={14} color="#FFFFFF" fill="#FFFFFF" />
+                      </View>
+                    </View>
+                  ) : null}
+                </>
+              ) : (
+                <View style={[styles.gridImage, styles.gridPlaceholder]}>
+                  {isVideo ? (
+                    <View style={styles.gridPlayCircle}>
+                      <Play size={14} color="#FFFFFF" fill="#FFFFFF" />
+                    </View>
+                  ) : (
+                    <Text numberOfLines={3} style={styles.gridTitle}>
+                      {item.title}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        }}
         ListEmptyComponent={isLoading ? null : <EmptyState emoji={emptyText.emoji} title={emptyText.title} />}
         contentContainerStyle={{ paddingBottom: 24 }}
       />
@@ -365,5 +387,25 @@ const styles = StyleSheet.create({
     color: Colors.mutedText,
     fontSize: 10,
     textAlign: "center",
+  },
+  gridVideoOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.2)",
+  },
+  gridPlayCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(15,15,15,0.75)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
   },
 });

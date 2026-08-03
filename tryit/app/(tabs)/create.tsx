@@ -159,7 +159,8 @@ export default function CreateScreen() {
     setPosting(true);
     setUploadProgress(0);
     try {
-      const uploadedItems: { url: string; type: "image" | "video" }[] = [];
+      const uploadedItems: { url: string; type: "image" | "video"; thumbnail?: string }[] = [];
+      let videoThumbnailUrl: string | undefined;
 
       if (hasPhoto && photoBase64) {
         setUploadProgress(10);
@@ -169,8 +170,9 @@ export default function CreateScreen() {
 
       if (hasVideo && videoUri) {
         setUploadProgress(uploadedItems.length > 0 ? 50 : 10);
-        const videoUrl = await uploadPostVideo(videoUri, videoExt, userId);
-        uploadedItems.push({ url: videoUrl, type: "video" });
+        const { videoUrl, thumbnailUrl } = await uploadPostVideo(videoUri, videoExt, userId);
+        uploadedItems.push({ url: videoUrl, type: "video", thumbnail: thumbnailUrl });
+        videoThumbnailUrl = thumbnailUrl;
       }
 
       setUploadProgress(85);
@@ -194,6 +196,7 @@ export default function CreateScreen() {
           caption: caption.trim(),
           mediaUrl: uploadedItems[0].url,
           mediaType: uploadedItems[0].type,
+          thumbnailUrl: videoThumbnailUrl,
           category,
           location: location.trim(),
         });
