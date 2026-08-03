@@ -1,5 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { decode } from "base64-arraybuffer";
+import * as FileSystem from "expo-file-system";
+import { File as ExpoFile } from "expo-file-system";
 import * as VideoThumbnails from "expo-video-thumbnails";
 
 import { supabase } from "@/lib/supabase";
@@ -1052,6 +1054,46 @@ export async function markConversationRead(conversationId: string): Promise<void
 
 // ─── Storage ──────────────────────────────────────────────────────────────
 
+/**
+ * Upload a local file URI to a Supabase Storage bucket using the Expo
+ * FileSystem File object as a Blob. This avoids the React Native
+ * `fetch(...).blob()` path that can produce an empty body for video files
+ * picked via the image picker.
+ */
+async function uploadLocalFileToStorage(
+  bucket: string,
+  path: string,
+  fileUri: string,
+  contentType: string,
+): Promise<string> {
+  const info = await FileSystem.getInfoAsync(fileUri);
+  if (!info.exists || info.isDirectory || info.size === 0) {
+    throw new Error("Selected media file is empty or missing. Please pick again.");
+  }
+  console.log("[uploadLocalFileToStorage] uploading", { path, size: info.size, contentType });
+  const file = new ExpoFile(fileUri);
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(path, file as Blob, { contentType, upsert: false });
+  if (error) {
+    throw new Error(`Media upload failed: ${error.message}`);
+  }
+  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+}
+
+/** Sanity-check that a public storage URL actually points to a reachable, non-empty object. */
+export async function verifyStorageUrl(url: string): Promise<number> {
+  const response = await fetch(url, { method: "HEAD" });
+  if (!response.ok) {
+    throw new Error(`Uploaded media is not reachable (${response.status}). Please try again.`);
+  }
+  const contentLength = Number(response.headers.get("content-length"));
+  if (Number.isNaN(contentLength) || contentLength === 0) {
+    throw new Error("Uploaded media file is empty. Please pick a different video.");
+  }
+  return contentLength;
+}
+
 /** Upload an image (base64) to post-media storage. */
 export async function uploadPostMedia(base64: string, extension: string, userId: string): Promise<string> {
   const ext = extension.toLowerCase() === "png" ? "png" : "jpg";
@@ -1075,17 +1117,8 @@ export async function uploadPostVideo(
   const baseName = `${userId}/${Date.now()}`;
   const videoPath = `${baseName}.${ext}`;
   console.log("[uploadPostVideo] uploading", { uri, ext, contentType, path: videoPath });
-  const response = await fetch(uri);
-  const blob = await response.blob();
-  console.log("[uploadPostVideo] blob size", blob.size, "type", blob.type);
-  const { error } = await supabase.storage
-    .from("post-media")
-    .upload(videoPath, blob, { contentType, upsert: false });
-  if (error) {
-    console.log("[uploadPostVideo] upload error", error.message);
-    throw error;
-  }
-  const videoUrl = supabase.storage.from("post-media").getPublicUrl(videoPath).data.publicUrl;
+
+  const videoUrl = await uploadLocalFileToStorage("post-media", videoPath, uri, contentType);
   console.log("[uploadPostVideo] uploaded to", videoUrl);
 
   // Generate a thumbnail from the first frame and upload it alongside the video.
@@ -1095,20 +1128,11 @@ export async function uploadPostVideo(
       time: 0,
       quality: 0.7,
     });
-    const thumbResponse = await fetch(thumbUri);
-    const thumbBlob = await thumbResponse.blob();
     const thumbPath = `${baseName}-thumb.jpg`;
-    const { error: thumbError } = await supabase.storage
-      .from("post-media")
-      .upload(thumbPath, thumbBlob, { contentType: "image/jpeg", upsert: false });
-    if (!thumbError) {
-      thumbnailUrl = supabase.storage.from("post-media").getPublicUrl(thumbPath).data.publicUrl;
-      console.log("[uploadPostVideo] thumbnail uploaded to", thumbnailUrl);
-    } else {
-      console.log("[uploadPostVideo] thumbnail upload error", thumbError.message);
-    }
+    thumbnailUrl = await uploadLocalFileToStorage("post-media", thumbPath, thumbUri, "image/jpeg");
+    console.log("[uploadPostVideo] thumbnail uploaded to", thumbnailUrl);
   } catch (e) {
-    console.log("[uploadPostVideo] thumbnail generation failed", e);
+    console.log("[uploadPostVideo] thumbnail generation/upload failed", e);
   }
 
   return { videoUrl, thumbnailUrl };

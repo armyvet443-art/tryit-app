@@ -4,6 +4,7 @@ import { useEventListener } from "expo";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import * as FileSystem from "expo-file-system";
+import * as VideoThumbnails from "expo-video-thumbnails";
 import { useRouter } from "expo-router";
 import { Camera, Crop, ImageIcon, ImagePlus, Play, Video as VideoIcon, X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
@@ -23,7 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
-import { createPost, uploadPostMedia, uploadPostVideo } from "@/services/tryit-service";
+import { createPost, uploadPostMedia, uploadPostVideo, verifyStorageUrl } from "@/services/tryit-service";
 import { CATEGORIES } from "@/types/models";
 
 /**
@@ -33,12 +34,14 @@ import { CATEGORIES } from "@/types/models";
  */
 function VideoPreviewSlot({
   uri,
+  thumbnailUri,
   playing,
   onPlay,
   onEnd,
   onRemove,
 }: {
   uri: string;
+  thumbnailUri?: string | null;
   playing: boolean;
   onPlay: () => void;
   onEnd: () => void;
@@ -73,14 +76,23 @@ function VideoPreviewSlot({
         allowsPictureInPicture={false}
       />
       {!playing ? (
-        <TouchableOpacity
-          style={styles.playOverlayBtn}
-          onPress={onPlay}
-          activeOpacity={0.8}
-          testID="preview-video-play"
-        >
-          <Play size={32} color="#FFFFFF" fill="#FFFFFF" />
-        </TouchableOpacity>
+        <>
+          {thumbnailUri ? (
+            <Image
+              source={{ uri: thumbnailUri }}
+              style={styles.thumbnailPreview}
+              contentFit="cover"
+            />
+          ) : null}
+          <TouchableOpacity
+            style={styles.playOverlayBtn}
+            onPress={onPlay}
+            activeOpacity={0.8}
+            testID="preview-video-play"
+          >
+            <Play size={32} color="#FFFFFF" fill="#FFFFFF" />
+          </TouchableOpacity>
+        </>
       ) : null}
       <TouchableOpacity style={styles.removeBtn} onPress={onRemove} testID="remove-video">
         <X size={16} color="#FFFFFF" />
@@ -113,6 +125,7 @@ export default function CreateScreen() {
   // Secondary media (video) — slot 2
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [videoExt, setVideoExt] = useState<string>("mp4");
+  const [videoThumbUri, setVideoThumbUri] = useState<string | null>(null);
 
   const [videoPlaying, setVideoPlaying] = useState<boolean>(false);
   const [posting, setPosting] = useState<boolean>(false);
@@ -195,6 +208,16 @@ export default function CreateScreen() {
       setVideoUri(asset.uri);
       const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "mp4";
       setVideoExt(ext === "mov" ? "mov" : "mp4");
+      try {
+        const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(asset.uri, {
+          time: 0,
+          quality: 0.7,
+        });
+        setVideoThumbUri(thumbUri);
+      } catch (e) {
+        console.log("[pickVideo] thumbnail generation failed", e);
+        setVideoThumbUri(null);
+      }
     }
   };
 
@@ -206,6 +229,7 @@ export default function CreateScreen() {
 
   const removeVideo = () => {
     setVideoUri(null);
+    setVideoThumbUri(null);
     setVideoPlaying(false);
   };
 
@@ -244,6 +268,15 @@ export default function CreateScreen() {
         const { videoUrl, thumbnailUrl } = await uploadPostVideo(videoUri, videoExt, userId);
         uploadedItems.push({ url: videoUrl, type: "video", thumbnail: thumbnailUrl });
         videoThumbnailUrl = thumbnailUrl;
+      }
+
+      setUploadProgress(80);
+      console.log("[handlePost] verifying uploaded URLs", uploadedItems.length, "media items");
+      for (const item of uploadedItems) {
+        await verifyStorageUrl(item.url);
+        if (item.thumbnail) {
+          await verifyStorageUrl(item.thumbnail);
+        }
       }
 
       setUploadProgress(85);
@@ -370,6 +403,7 @@ export default function CreateScreen() {
             {videoUri ? (
               <VideoPreviewSlot
                 uri={videoUri}
+                thumbnailUri={videoThumbUri}
                 playing={videoPlaying}
                 onPlay={() => setVideoPlaying(true)}
                 onEnd={() => setVideoPlaying(false)}
@@ -637,6 +671,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(15,15,15,0.35)",
+  },
+  thumbnailPreview: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   collageHint: {
     color: Colors.flameOrange,
