@@ -402,6 +402,7 @@ export default function PostCard({
                 style={styles.collageMedia}
                 contentFit="cover"
                 transition={200}
+                onError={() => console.warn('[PostCard] media load failed for post', post.id, item.url)}
               />
               {item.type === "video" ? (
                 <View style={styles.playOverlaySmall}>
@@ -432,6 +433,7 @@ export default function PostCard({
             style={styles.media}
             contentFit="cover"
             transition={200}
+            onError={() => console.warn('[PostCard] media load failed for post', post.id, post.media_url)}
           />
           {post.media_type === "video" ? (
             <View style={styles.playOverlay} testID={`video-play-${post.id}`}>

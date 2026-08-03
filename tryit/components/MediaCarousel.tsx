@@ -76,6 +76,7 @@ function ImageTile({ item, onOpenDetail }: { item: MediaItem; onOpenDetail?: () 
         transition={200}
         recyclingKey={item.url}
         cachePolicy="memory-disk"
+        onError={() => console.warn('[MediaCarousel] image load failed', item.url)}
       />
     </TouchableOpacity>
   );

@@ -1159,6 +1159,16 @@ export async function createPost(input: {
   const thumbnailUrlValue = hasMulti
     ? input.mediaItems?.find((m) => m.type === "image")?.url ?? input.mediaItems?.[0]?.thumbnail ?? input.thumbnailUrl
     : input.thumbnailUrl;
+
+  // Validate that we actually have a media URL before inserting — never create
+  // a post with null/empty media_urls (that's what caused black tiles & crashes).
+  const allUrls = hasMulti
+    ? (input.mediaItems ?? []).map((m) => m.url).filter((u) => u && u.trim().length > 0)
+    : [input.mediaUrl].filter((u) => u && u.trim().length > 0);
+  if (allUrls.length === 0) {
+    throw new Error("Cannot create post without valid media. Upload may have failed.");
+  }
+
   const { error } = await supabase.from("posts").insert({
     user_id: input.userId,
     title: input.title,
@@ -1169,7 +1179,26 @@ export async function createPost(input: {
     category: input.category,
     location: input.location,
   });
-  if (error) throw error;
+  if (error) {
+    // Post creation failed — clean up orphaned storage files to avoid bloat.
+    // Extract storage paths from the uploaded URLs and remove them.
+    const pathsToRemove: string[] = [];
+    for (const url of allUrls) {
+      const p = extractStoragePath(url, "post-media");
+      if (p) pathsToRemove.push(p);
+    }
+    // Also clean up thumbnail if it was uploaded separately
+    if (input.thumbnailUrl) {
+      const tp = extractStoragePath(input.thumbnailUrl, "post-media");
+      if (tp && !pathsToRemove.includes(tp)) pathsToRemove.push(tp);
+    }
+    if (pathsToRemove.length > 0) {
+      supabase.storage.from("post-media").remove(pathsToRemove).then(({ error: rmErr }) => {
+        if (rmErr) console.log("[createPost] orphan cleanup failed", rmErr.message);
+      });
+    }
+    throw error;
+  }
 }
 
 // ─── Edit / Delete Post ───────────────────────────────────────────────────
