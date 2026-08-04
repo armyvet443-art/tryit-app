@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { decode } from "base64-arraybuffer";
-import * as FileSystem from "expo-file-system";
-import { File as ExpoFile } from "expo-file-system";
+import { File } from "expo-file-system";
 import * as VideoThumbnails from "expo-video-thumbnails";
 
 import { supabase } from "@/lib/supabase";
@@ -1055,10 +1054,15 @@ export async function markConversationRead(conversationId: string): Promise<void
 // ─── Storage ──────────────────────────────────────────────────────────────
 
 /**
- * Upload a local file URI to a Supabase Storage bucket using the Expo
- * FileSystem File object as a Blob. This avoids the React Native
- * `fetch(...).blob()` path that can produce an empty body for video files
- * picked via the image picker.
+ * Upload a local file URI to a Supabase Storage bucket.
+ *
+ * Uses the SDK 54 `File` class (implements `Blob`) to read the file into an
+ * ArrayBuffer, then uploads the raw buffer. This avoids both broken paths:
+ *   - `fetch(uri).blob()` → empty body on React Native for video URIs
+ *   - Passing `File` directly as Blob to supabase-js upload → unreliable
+ *
+ * Reading `arrayBuffer()` first ensures we have real bytes in memory before
+ * the upload starts, matching the proven photo path (decode(base64) → buffer).
  */
 async function uploadLocalFileToStorage(
   bucket: string,
@@ -1066,19 +1070,52 @@ async function uploadLocalFileToStorage(
   fileUri: string,
   contentType: string,
 ): Promise<string> {
-  const info = await FileSystem.getInfoAsync(fileUri);
-  if (!info.exists || info.isDirectory || info.size === 0) {
-    throw new Error("Selected media file is empty or missing. Please pick again.");
+  let file: File;
+  try {
+    file = new File(fileUri);
+  } catch (e) {
+    console.log("[uploadLocalFileToStorage] File constructor threw", e);
+    throw new Error("Could not open the selected file. Please pick again.");
   }
-  console.log("[uploadLocalFileToStorage] uploading", { path, size: info.size, contentType });
-  const file = new ExpoFile(fileUri);
+
+  if (!file.exists) {
+    console.log("[uploadLocalFileToStorage] file does not exist", fileUri);
+    throw new Error("Selected media file is missing. Please pick again.");
+  }
+  if (file.size === null || file.size === 0) {
+    console.log("[uploadLocalFileToStorage] file is empty", fileUri, file.size);
+    throw new Error("Selected media file is empty. Please pick again.");
+  }
+
+  console.log("[uploadLocalFileToStorage] uploading", { path, size: file.size, contentType });
+
+  // Read the entire file into memory as an ArrayBuffer.
+  // This is the reliable path — we have real bytes before the upload starts.
+  let buffer: ArrayBuffer;
+  try {
+    buffer = await file.arrayBuffer();
+  } catch (e) {
+    console.log("[uploadLocalFileToStorage] arrayBuffer() threw", e);
+    throw new Error("Could not read the video file data. Please pick again.");
+  }
+
+  if (!buffer || buffer.byteLength === 0) {
+    throw new Error("Video file read as empty. Please pick a different video.");
+  }
+
+  console.log("[uploadLocalFileToStorage] buffer bytes", buffer.byteLength);
+
   const { error } = await supabase.storage
     .from(bucket)
-    .upload(path, file as Blob, { contentType, upsert: false });
+    .upload(path, buffer, { contentType, upsert: false });
   if (error) {
+    console.log("[uploadLocalFileToStorage] supabase upload error", error.message);
     throw new Error(`Media upload failed: ${error.message}`);
   }
-  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+
+  const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+  console.log("[uploadLocalFileToStorage] uploaded to", publicUrl);
+  return publicUrl;
 }
 
 /** Sanity-check that a public storage URL actually points to a reachable, non-empty object. */

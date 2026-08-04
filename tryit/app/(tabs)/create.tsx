@@ -3,7 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useEventListener } from "expo";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
-import * as FileSystem from "expo-file-system";
+import { File } from "expo-file-system";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { useRouter } from "expo-router";
 import { Camera, Crop, ImageIcon, ImagePlus, Play, Video as VideoIcon, X } from "lucide-react-native";
@@ -186,8 +186,8 @@ export default function CreateScreen() {
     if (!result.canceled && result.assets.length > 0) {
       const asset = result.assets[0];
       try {
-        const info = await FileSystem.getInfoAsync(asset.uri);
-        const sizeBytes = info.exists && !info.isDirectory ? info.size : 0;
+        const file = new File(asset.uri);
+        const sizeBytes = file.exists && file.size ? file.size : 0;
         if (sizeBytes > MAX_VIDEO_BYTES) {
           Alert.alert(
             "Video too large",
@@ -325,8 +325,12 @@ export default function CreateScreen() {
     } catch (e) {
       const message = e instanceof Error ? e.message : "Something went wrong.";
       setUploadProgress(0);
-      Alert.alert("Upload failed", "Check your internet and try again. Your draft is saved.");
       console.log("[handlePost] error", message);
+      // Show the real error so the tester can report what actually failed
+      Alert.alert(
+        "Upload failed",
+        `${message}\n\nYour draft is saved. Try again or pick a different video.`,
+      );
     } finally {
       setPosting(false);
     }
