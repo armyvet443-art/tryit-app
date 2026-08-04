@@ -180,8 +180,8 @@ export default function CreateScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["videos"],
       allowsEditing: true,
-      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Low,
-      videoExportPreset: ImagePicker.VideoExportPreset.LowQuality,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.High,
+      videoExportPreset: ImagePicker.VideoExportPreset.HighestQuality,
     });
     if (!result.canceled && result.assets.length > 0) {
       const asset = result.assets[0];
