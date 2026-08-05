@@ -33,13 +33,18 @@ function RootLayoutNav() {
     // Listen for notification taps and deep-link to the relevant screen.
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
-        const data = response.notification.request.content.data as Record<string, unknown>;
-        const postId = data?.postId ? String(data.postId) : null;
-        const actorId = data?.actorId ? String(data.actorId) : null;
-        if (postId) {
-          router.push({ pathname: "/post/[id]", params: { id: postId } });
-        } else if (actorId) {
-          router.push({ pathname: "/user/[id]", params: { id: actorId } });
+        try {
+          const data =
+            (response?.notification?.request?.content?.data as Record<string, unknown>) ?? {};
+          const postId = data?.postId ? String(data.postId) : null;
+          const actorId = data?.actorId ? String(data.actorId) : null;
+          if (postId) {
+            router.push({ pathname: "/post/[id]", params: { id: postId } });
+          } else if (actorId) {
+            router.push({ pathname: "/user/[id]", params: { id: actorId } });
+          }
+        } catch (e) {
+          console.log("[push] notification tap handler failed", e);
         }
       },
     );

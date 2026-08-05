@@ -2,6 +2,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import type { Session } from "@supabase/supabase-js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { InteractionManager } from "react-native";
 
 import { supabase } from "@/lib/supabase";
 import { registerPushToken, unregisterPushToken } from "@/services/push-service";
@@ -69,10 +70,16 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         }
       })
       .catch((e) => console.log("[auth] migration failed", e));
-    // Register push token for notifications (best-effort)
-    registerPushToken(userId).catch((e) =>
-      console.log("[auth] push token registration failed", e),
-    );
+    // Register push token for notifications (best-effort).
+    // Defer until after interactions/mount settle to avoid crashing during the
+    // heavy sign-up -> session transition (observed as a Hermes null-deref).
+    InteractionManager.runAfterInteractions(async () => {
+      try {
+        await registerPushToken(userId);
+      } catch (e) {
+        console.log("[auth] push token registration failed", e);
+      }
+    });
   }, [userId, guestId, queryClient]);
 
   const profileQuery = useQuery<UserProfile | null>({
