@@ -9,14 +9,12 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import Colors from "@/constants/colors";
 import { fontMap } from "@/constants/typography";
-import { initSentry, Sentry } from "@/lib/sentry";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { configureNotifications } from "@/services/push-service";
 
 SplashScreen.preventAutoHideAsync();
 
 configureNotifications();
-initSentry();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -106,4 +104,4 @@ function RootLayoutInner() {
   );
 }
 
-export default Sentry.Native.wrap(RootLayoutInner);
+export default RootLayoutInner;

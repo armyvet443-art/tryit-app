@@ -1,35 +1,26 @@
-import * as Sentry from "sentry-expo";
+/**
+ * Sentry stub — completely disabled to prevent launch crashes.
+ * All exports are no-ops so existing imports (ErrorBoundary, AuthProvider,
+ * index.tsx) keep working without any native Sentry code running.
+ *
+ * To re-enable safely in a future build, replace this file with a real
+ * Sentry.init() called inside useEffect (NOT at module top-level) and
+ * re-add the sentry-expo plugin in app.json.
+ */
 
-const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-// Placeholder DSN so Sentry is always wired in release builds, even before the
-// user creates a real Sentry project. Events sent here are safely dropped by Sentry.
-const PLACEHOLDER_DSN =
-  "https://00000000000000000000000000000000@o000000.ingest.sentry.io/0000000";
+export const Sentry = {
+  Native: {
+    init: (_opts?: any) => {},
+    captureException: (_err: any, _opts?: any) => {},
+    captureMessage: (_msg: string, _opts?: any) => {},
+    addBreadcrumb: (_crumb: any) => {},
+    setUser: (_user: any) => {},
+    wrap: <T,>(component: T): T => component,
+  },
+} as const;
 
 export function initSentry(): void {
-  const activeDsn = dsn || PLACEHOLDER_DSN;
-  if (!activeDsn) {
-    console.log("[sentry] DSN not configured, skipping initialization");
-    return;
-  }
-
-  Sentry.init({
-    dsn: activeDsn,
-    enableInExpoDevelopment: false,
-    debug: __DEV__,
-    // Capture native crashes as well as JS errors
-    enableNative: true,
-    // Sample rate for performance monitoring (disabled by default to keep volume low)
-    tracesSampleRate: 0.0,
-    // Attach user context only when explicitly set
-    initialScope: {
-      tags: {
-        app: "tryit",
-        platform: "react-native",
-      },
-    },
-  });
+  // No-op — Sentry removed to fix launch crash in Build 18.
 }
-
-export { Sentry };
