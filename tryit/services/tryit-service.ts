@@ -888,6 +888,45 @@ export async function searchByHashtag(tag: string): Promise<TryPost[]> {
   return attachAuthors((data ?? []) as Record<string, unknown>[]);
 }
 
+/** A trending hashtag with its post count. */
+export interface TrendingHashtag {
+  tag: string;
+  count: number;
+}
+
+/** Fetch the top trending hashtags by scanning post captions and titles. */
+export async function fetchTrendingHashtags(limit: number = 10): Promise<TrendingHashtag[]> {
+  try {
+    const { data, error } = await supabase
+      .from("posts")
+      .select("title, caption")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) {
+      console.log("[fetchTrendingHashtags] error", error.message);
+      return [];
+    }
+    const counts = new Map<string, number>();
+    const regex = /#[\w]+/g;
+    for (const row of (data ?? []) as Record<string, unknown>[]) {
+      const text = `${String(row.title ?? "")} ${String(row.caption ?? "")}`;
+      const matches = text.match(regex);
+      if (!matches) continue;
+      for (const m of matches) {
+        const tag = m.slice(1).toLowerCase();
+        if (tag.length > 0) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
+  } catch (e) {
+    console.log("[fetchTrendingHashtags] failed", e);
+    return [];
+  }
+}
+
 export async function getPostsByCategory(category: string): Promise<TryPost[]> {
   const { data, error } = await supabase
     .from("posts")

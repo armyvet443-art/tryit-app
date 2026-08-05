@@ -1,26 +1,64 @@
 /**
- * Sentry stub — completely disabled to prevent launch crashes.
- * All exports are no-ops so existing imports (ErrorBoundary, AuthProvider,
- * index.tsx) keep working without any native Sentry code running.
+ * Sentry integration — safely initialized inside useEffect (NOT at module
+ * top-level) to prevent launch crashes. If Sentry fails to init, the app
+ * continues normally with no-op stubs.
  *
- * To re-enable safely in a future build, replace this file with a real
- * Sentry.init() called inside useEffect (NOT at module top-level) and
- * re-add the sentry-expo plugin in app.json.
+ * Re-enabled in Build 22 with:
+ * - init deferred to useEffect (runs after app mounts)
+ * - enableNative: false (no native module auto-init)
+ * - enableAutoSessionTracking: false
+ * - try/catch around everything
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import * as SentryLib from "@sentry/react-native";
+
+const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
+
+let initialized = false;
+
+export function initSentry(): void {
+  if (initialized) return;
+  try {
+    if (!dsn) {
+      console.log("[sentry] DSN not configured, skipping initialization");
+      return;
+    }
+    SentryLib.init({
+      dsn,
+      debug: false,
+      enableNative: false,
+      enableAutoSessionTracking: false,
+      tracesSampleRate: 0.0,
+      initialScope: {
+        tags: {
+          app: "tryit",
+          platform: "react-native",
+        },
+      },
+    });
+    initialized = true;
+  } catch (e) {
+    console.log("[sentry] init failed", e);
+  }
+}
 
 export const Sentry = {
   Native: {
-    init: (_opts?: any) => {},
-    captureException: (_err: any, _opts?: any) => {},
-    captureMessage: (_msg: string, _opts?: any) => {},
-    addBreadcrumb: (_crumb: any) => {},
-    setUser: (_user: any) => {},
+    init: (opts?: Parameters<typeof SentryLib.init>[0]) => {
+      try { SentryLib.init(opts ?? {}); } catch { /* ignore */ }
+    },
+    captureException: (err: unknown, opts?: Record<string, unknown>) => {
+      try { SentryLib.captureException(err as any, opts as any); } catch { /* ignore */ }
+    },
+    captureMessage: (msg: string, opts?: Record<string, unknown>) => {
+      try { SentryLib.captureMessage(msg, opts as any); } catch { /* ignore */ }
+    },
+    addBreadcrumb: (crumb: Record<string, unknown>) => {
+      try { SentryLib.addBreadcrumb(crumb as any); } catch { /* ignore */ }
+    },
+    setUser: (user: { id: string } | null) => {
+      try { SentryLib.setUser(user as any); } catch { /* ignore */ }
+    },
     wrap: <T,>(component: T): T => component,
   },
 } as const;
-
-export function initSentry(): void {
-  // No-op — Sentry removed to fix launch crash in Build 18.
-}

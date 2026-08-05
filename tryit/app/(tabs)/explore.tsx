@@ -1,11 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Search, X } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
+import { Search, TrendingUp, X } from "lucide-react-native";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,6 +23,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import {
   fetchCategoriesWithCounts,
   fetchFeed,
+  fetchTrendingHashtags,
   filterBlockedPosts,
   getBlockedUserIds,
   getPostsByCategory,
@@ -29,6 +31,7 @@ import {
   searchPosts,
   searchUsers,
   type CategoryWithCount,
+  type TrendingHashtag,
 } from "@/services/tryit-service";
 import { CATEGORIES, type AuthorProfile, type TryPost } from "@/types/models";
 import { formatCount, isHashtagQuery, normalizeHashtag } from "@/utils/format";
@@ -39,14 +42,15 @@ export default function ExploreScreen() {
   const { userId } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState<string>("");
   const [mode, setMode] = useState<SearchMode>("posts");
   const [category, setCategory] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
 
   const trimmed = query.trim();
   const searching = trimmed.length > 0;
 
-  // Fetch blocked user IDs to filter them from explore results.
   const blockedQuery = useQuery<Set<string>>({
     queryKey: ["blockedIds", userId],
     queryFn: () => getBlockedUserIds(userId, ""),
@@ -59,7 +63,13 @@ export default function ExploreScreen() {
     enabled: !searching && category === null,
   });
 
-  // Dynamic categories from the database — falls back to the static CATEGORIES list.
+  const hashtagsQuery = useQuery<TrendingHashtag[]>({
+    queryKey: ["explore-hashtags"],
+    queryFn: () => fetchTrendingHashtags(10),
+    staleTime: 60_000,
+    enabled: !searching && category === null,
+  });
+
   const categoriesQuery = useQuery<CategoryWithCount[]>({
     queryKey: ["explore-categories"],
     queryFn: () => fetchCategoriesWithCounts(30),
@@ -69,10 +79,8 @@ export default function ExploreScreen() {
   const categoryList = useMemo<CategoryWithCount[]>(() => {
     const dynamic = categoriesQuery.data ?? [];
     if (dynamic.length >= 3) {
-      // Merge: ensure all dynamic categories are present, keep dynamic counts.
       const map = new Map<string, number>();
       for (const c of dynamic) map.set(c.name, c.count);
-      // Also include any static categories not in dynamic (count 0).
       for (const s of CATEGORIES) {
         if (!map.has(s)) map.set(s, 0);
       }
@@ -81,7 +89,6 @@ export default function ExploreScreen() {
         .sort((a, b) => b.count - a.count)
         .slice(0, 20);
     }
-    // Fallback: static categories with count 0.
     return CATEGORIES.map((name) => ({ name, count: 0 }));
   }, [categoriesQuery.data]);
 
@@ -120,6 +127,17 @@ export default function ExploreScreen() {
     (searching && mode === "users" && userResults.isLoading) ||
     (!searching && category === null && trendingQuery.isLoading) ||
     (!searching && category !== null && categoryQuery.isLoading);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    queryClient.invalidateQueries({ queryKey: ["explore-trending"] });
+    queryClient.invalidateQueries({ queryKey: ["explore-hashtags"] });
+    queryClient.invalidateQueries({ queryKey: ["explore-categories"] });
+    if (category) queryClient.invalidateQueries({ queryKey: ["explore-category", category] });
+    queryClient.invalidateQueries({ queryKey: ["search-posts", trimmed] });
+    queryClient.invalidateQueries({ queryKey: ["search-users", trimmed] });
+    setRefreshing(false);
+  }, [queryClient, category, trimmed]);
 
   const renderPostTile = ({ item }: { item: TryPost }) => (
     <TouchableOpacity
@@ -184,6 +202,28 @@ export default function ExploreScreen() {
         ) : null}
       </View>
 
+      {/* Trending hashtags panel — shown when not searching and no category selected */}
+      {!searching && category === null && (hashtagsQuery.data?.length ?? 0) > 0 ? (
+        <View style={styles.hashtagsPanel}>
+          <View style={styles.hashtagsHeader}>
+            <TrendingUp size={14} color={Colors.flameOrange} />
+            <Text style={styles.hashtagsTitle}>Trending Hashtags</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hashtagsScroll}>
+            {hashtagsQuery.data!.map((ht) => (
+              <TouchableOpacity
+                key={ht.tag}
+                style={styles.hashtagChip}
+                onPress={() => setQuery(`#${ht.tag}`)}
+              >
+                <Text style={styles.hashtagText}>#{ht.tag}</Text>
+                <Text style={styles.hashtagCount}>{formatCount(ht.count)}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+
       {searching ? (
         <View style={styles.modeRow}>
           {(["posts", "users"] as SearchMode[]).map((m) => (
@@ -233,6 +273,7 @@ export default function ExploreScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderUserRow}
           contentContainerStyle={styles.listContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.flameOrange} />}
           ListEmptyComponent={<EmptyState emoji="🔍" title="No people found" subtitle={`No results for '${trimmed}' — try another name.`} />}
         />
       ) : (
@@ -243,7 +284,16 @@ export default function ExploreScreen() {
           numColumns={2}
           columnWrapperStyle={styles.gridRow}
           contentContainerStyle={styles.listContent}
-          ListEmptyComponent={<EmptyState emoji="🔍" title="Nothing here yet" subtitle={`No results for '${trimmed}' — try another category or search term.`} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.flameOrange} />}
+          ListEmptyComponent={
+            searching ? (
+              <EmptyState emoji="🔍" title="Nothing here yet" subtitle={`No results for '${trimmed}' — try another category or search term.`} />
+            ) : category ? (
+              <EmptyState emoji="📂" title="No Tries in this category" subtitle="Be the first to post in this category!" />
+            ) : (
+              <EmptyState emoji="🔥" title="No Tries yet" subtitle="Be the first to share something!" />
+            )
+          }
         />
       )}
     </View>
@@ -279,6 +329,48 @@ const styles = StyleSheet.create({
     color: Colors.text,
     fontSize: 14,
     padding: 0,
+  },
+  hashtagsPanel: {
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  hashtagsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  hashtagsTitle: {
+    color: Colors.flameOrange,
+    fontSize: 12,
+    fontWeight: "700" as const,
+    letterSpacing: 0.8,
+  },
+  hashtagsScroll: {
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  hashtagChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,106,0,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255,106,0,0.3)",
+  },
+  hashtagText: {
+    color: Colors.flameOrange,
+    fontSize: 13,
+    fontWeight: "700" as const,
+  },
+  hashtagCount: {
+    color: Colors.mutedText,
+    fontSize: 11,
+    fontWeight: "600" as const,
   },
   modeRow: {
     flexDirection: "row",

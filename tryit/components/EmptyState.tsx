@@ -14,7 +14,9 @@ interface EmptyStateProps {
 export default function EmptyState({ emoji, title, subtitle, actionLabel, onAction }: EmptyStateProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.emoji}>{emoji}</Text>
+      <View style={styles.emojiCircle}>
+        <Text style={styles.emoji}>{emoji}</Text>
+      </View>
       <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       {actionLabel && onAction ? (
@@ -32,10 +34,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 64,
     paddingHorizontal: 32,
-    gap: 8,
+    gap: 10,
+  },
+  emojiCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.surfaceVariant,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   emoji: {
-    fontSize: 44,
+    fontSize: 36,
   },
   title: {
     color: Colors.text,

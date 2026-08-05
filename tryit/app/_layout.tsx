@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import Colors from "@/constants/colors";
 import { fontMap } from "@/constants/typography";
+import { initSentry } from "@/lib/sentry";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { configureNotifications } from "@/services/push-service";
 
@@ -81,6 +82,11 @@ function RootLayoutNav() {
 
 function RootLayoutInner() {
   const [fontsLoaded, fontError] = useFonts(fontMap);
+
+  // Initialize Sentry safely AFTER the app has mounted — never at top level.
+  useEffect(() => {
+    initSentry();
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {

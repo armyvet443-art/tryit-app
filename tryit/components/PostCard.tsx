@@ -51,7 +51,7 @@ function safePlayerCall(fn: () => void): void {
   }
 }
 
-function FeedVideoTile({ url, thumbnail, onOpenDetail }: { url: string; thumbnail: string | null; onOpenDetail: () => void }) {
+function FeedVideoTile({ url, thumbnail, onOpenDetail, inView }: { url: string; thumbnail: string | null; onOpenDetail: () => void; inView: boolean }) {
   const [muted, setMuted] = useState<boolean>(true);
   const [duration, setDuration] = useState<number>(0);
   const mountedRef = useRef<boolean>(true);
@@ -68,6 +68,16 @@ function FeedVideoTile({ url, thumbnail, onOpenDetail }: { url: string; thumbnai
       safePlayerCall(() => player.pause());
     };
   }, [player]);
+
+  // Only play when the card is actually visible on screen — pause when scrolled away.
+  useEffect(() => {
+    if (!mountedRef.current) return;
+    if (inView) {
+      safePlayerCall(() => player.play());
+    } else {
+      safePlayerCall(() => player.pause());
+    }
+  }, [inView, player]);
 
   useEffect(() => {
     if (!mountedRef.current) return;
@@ -86,11 +96,6 @@ function FeedVideoTile({ url, thumbnail, onOpenDetail }: { url: string; thumbnai
       /* player released */
     }
   });
-
-  useEffect(() => {
-    if (!mountedRef.current) return;
-    safePlayerCall(() => player.play());
-  }, [player]);
 
   return (
     <View style={feedVideoStyles.container}>
@@ -196,6 +201,7 @@ interface PostCardProps {
   showFollow?: boolean;
   fired?: boolean;
   fireCount?: number;
+  inView?: boolean;
   onDeleted?: (postId: string) => void;
   onBlocked?: (blockedUserId: string) => void;
 }
@@ -210,6 +216,7 @@ export default function PostCard({
   showFollow = true,
   fired = false,
   fireCount = 0,
+  inView = true,
   onDeleted,
   onBlocked,
 }: PostCardProps) {
@@ -244,6 +251,8 @@ export default function PostCard({
   const [fireCountState, setFireCountState] = useState<number>(fireCount);
   const fireScale = React.useRef(new Animated.Value(1)).current;
   const reactionScale = React.useRef(new Animated.Value(1)).current;
+  const lastTapRef = useRef<number>(0);
+  const heartAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => setReaction(myReaction), [myReaction]);
   useEffect(() => setIsTried(tried), [tried]);
@@ -573,6 +582,7 @@ export default function PostCard({
             url={post.media_url}
             thumbnail={post.thumbnail_url}
             onOpenDetail={openDetail}
+            inView={inView}
           />
         ) : (
           <TouchableOpacity activeOpacity={0.9} onPress={openDetail}>
@@ -590,6 +600,45 @@ export default function PostCard({
             ) : null}
           </TouchableOpacity>
         )
+      ) : null}
+
+      {/* Double-tap to fire overlay — sits above the media area */}
+      {post.media_url ? (
+        <View
+          style={styles.doubleTapLayer}
+          onStartShouldSetResponder={() => true}
+          onResponderGrant={(e) => {
+            const now = Date.now();
+            if (now - lastTapRef.current < 300) {
+              // Double tap — fire!
+              handleFire();
+              // Heart pop animation
+              heartAnim.setValue(0);
+              Animated.sequence([
+                Animated.timing(heartAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+                Animated.timing(heartAnim, { toValue: 0, duration: 600, delay: 200, useNativeDriver: true }),
+              ]).start();
+              lastTapRef.current = 0;
+            } else {
+              lastTapRef.current = now;
+            }
+          }}
+        >
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.heartPop,
+              {
+                opacity: heartAnim,
+                transform: [
+                  { scale: heartAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.5, 1.2, 1] }) },
+                ],
+              },
+            ]}
+          >
+            <Text style={styles.heartPopEmoji}>🔥</Text>
+          </Animated.View>
+        </View>
       ) : null}
 
       {/* Title & caption */}
@@ -1013,6 +1062,31 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(15,15,15,0.8)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  doubleTapLayer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 340,
+    zIndex: 0,
+  },
+  heartPop: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    marginLeft: -40,
+    marginTop: -40,
+    width: 80,
+    height: 80,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heartPopEmoji: {
+    fontSize: 56,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   playOverlay: {
     position: "absolute",

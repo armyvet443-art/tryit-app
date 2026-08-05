@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { MessageCircle } from "lucide-react-native";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -209,6 +209,25 @@ export default function FeedScreen() {
     [queryClient],
   );
 
+  // Track which post is currently most visible for autoplay-in-view.
+  const visiblePostIdRef = useRef<string | null>(null);
+  const [visiblePostId, setVisiblePostId] = useState<string | null>(null);
+
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<{ item: TryPost; isViewable: boolean }> }) => {
+      const visible = viewableItems.filter((v) => v.isViewable);
+      const mostVisible = visible[0];
+      const id = mostVisible?.item?.id ?? null;
+      if (id !== visiblePostIdRef.current) {
+        visiblePostIdRef.current = id;
+        setVisiblePostId(id);
+      }
+    },
+    [],
+  );
+
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+
   const renderItem = useCallback(
     ({ item }: { item: TryPost }) => (
       <PostCard
@@ -220,11 +239,12 @@ export default function FeedScreen() {
         isFollowingAuthor={followingQuery.data?.has(item.user_id) ?? false}
         fired={myFiresQuery.data?.has(item.id) ?? false}
         fireCount={fireCountsQuery.data?.[item.id] ?? 0}
+        inView={visiblePostId === item.id}
         onDeleted={handlePostDeleted}
         onBlocked={handleUserBlocked}
       />
     ),
-    [reactionsQuery.data, countsQuery.data, triedQuery.data, savedQuery.data, followingQuery.data, myFiresQuery.data, fireCountsQuery.data, handlePostDeleted, handleUserBlocked],
+    [reactionsQuery.data, countsQuery.data, triedQuery.data, savedQuery.data, followingQuery.data, myFiresQuery.data, fireCountsQuery.data, handlePostDeleted, handleUserBlocked, visiblePostId],
   );
 
   return (
@@ -284,6 +304,8 @@ export default function FeedScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           refreshControl={
             <RefreshControl
               refreshing={feedQuery.isRefetching}
