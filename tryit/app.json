@@ -44,7 +44,8 @@
           "color": "#FF6A00",
           "defaultChannel": "default"
         }
-      ]
+      ],
+      "sentry-expo"
     ],
     "experiments": {
       "typedRoutes": true
