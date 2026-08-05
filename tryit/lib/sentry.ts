@@ -24,7 +24,7 @@ export function initSentry(): void {
       return;
     }
     SentryLib.init({
-      dsn,
+      dsn: "https://02dea2470a4db2351750f9e04bdedc8f@o4511856553623552.ingest.us.sentry.io/4511856559325184",
       debug: false,
       enableNative: false,
       enableAutoSessionTracking: false,

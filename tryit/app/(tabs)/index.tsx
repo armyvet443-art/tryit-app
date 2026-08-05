@@ -213,20 +213,26 @@ export default function FeedScreen() {
   const visiblePostIdRef = useRef<string | null>(null);
   const [visiblePostId, setVisiblePostId] = useState<string | null>(null);
 
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: Array<{ item: TryPost; isViewable: boolean }> }) => {
-      const visible = viewableItems.filter((v) => v.isViewable);
-      const mostVisible = visible[0];
-      const id = mostVisible?.item?.id ?? null;
-      if (id !== visiblePostIdRef.current) {
-        visiblePostIdRef.current = id;
-        setVisiblePostId(id);
+  // STABLE refs — must never change identity between renders, otherwise
+  // FlatList throws "Changing onViewableItemsChanged nullability on the fly".
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60, minimumViewTime: 300 }).current;
+
+  const onViewableItemsChanged = useRef(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ({ viewableItems }: { viewableItems: Array<{ item: any; isViewable: boolean }> }) => {
+      try {
+        const visible = viewableItems.filter((v) => v.isViewable);
+        const mostVisible = visible[0];
+        const id = mostVisible?.item?.id ?? null;
+        if (id !== visiblePostIdRef.current) {
+          visiblePostIdRef.current = id;
+          setVisiblePostId(id);
+        }
+      } catch (e) {
+        console.log("[viewable] error", e);
       }
     },
-    [],
-  );
-
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+  ).current;
 
   const renderItem = useCallback(
     ({ item }: { item: TryPost }) => (
@@ -290,6 +296,8 @@ export default function FeedScreen() {
           renderItem={() => <SkeletonCard />}
           contentContainerStyle={styles.listContent}
           scrollEnabled={false}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
         />
       ) : feedQuery.isError ? (
         <View style={styles.loading}>
