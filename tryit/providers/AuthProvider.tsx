@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { InteractionManager } from "react-native";
 
+import { Sentry } from "@/lib/sentry";
 import { supabase } from "@/lib/supabase";
 import { registerPushToken, unregisterPushToken } from "@/services/push-service";
 import { getOrCreateGuestId, getProfile, migrateGuestData } from "@/services/tryit-service";
@@ -53,6 +54,15 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   }, []);
 
   const userId = session?.user?.id ?? null;
+
+  // Tag Sentry with the current user id whenever it changes (or clear it on sign-out).
+  useEffect(() => {
+    try {
+      Sentry.Native.setUser(userId ? { id: userId } : null);
+    } catch {
+      /* ignore */
+    }
+  }, [userId]);
 
   // Migrate guest reactions to the user account on first login/signup.
   // Runs once per guestId+userId pair to avoid duplicate work.
