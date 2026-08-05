@@ -1,3 +1,4 @@
+import { useEventListener } from "expo";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react-native";
@@ -15,6 +16,7 @@ import {
 
 import Colors from "@/constants/colors";
 import type { MediaItem } from "@/types/models";
+import { formatDuration } from "@/utils/format";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const MEDIA_HEIGHT = 360;
@@ -24,9 +26,10 @@ interface MediaCarouselProps {
   onOpenDetail?: () => void;
 }
 
-/** Single video tile — expo-video with autoplay muted loop. */
+/** Single video tile — expo-video with autoplay muted loop, sound toggle, duration. */
 function VideoTile({ item, active }: { item: MediaItem; active: boolean }) {
   const [muted, setMuted] = useState<boolean>(true);
+  const [duration, setDuration] = useState<number>(0);
   const player = useVideoPlayer(item.url, (p) => {
     p.loop = true;
     p.muted = true;
@@ -44,6 +47,12 @@ function VideoTile({ item, active }: { item: MediaItem; active: boolean }) {
     player.muted = muted;
   }, [muted, player]);
 
+  useEventListener(player, "statusChange", ({ status }) => {
+    if (status === "readyToPlay" && player.duration > 0) {
+      setDuration(player.duration);
+    }
+  });
+
   return (
     <View style={styles.mediaWrap}>
       <VideoView
@@ -58,9 +67,15 @@ function VideoTile({ item, active }: { item: MediaItem; active: boolean }) {
         style={styles.muteButton}
         onPress={() => setMuted((m) => !m)}
         testID="video-mute-toggle"
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
       >
         {muted ? <VolumeX size={16} color="#FFFFFF" /> : <Volume2 size={16} color="#FFFFFF" />}
       </TouchableOpacity>
+      {duration > 0 ? (
+        <View style={styles.durationBadge}>
+          <Text style={styles.durationText}>{formatDuration(duration)}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -248,5 +263,19 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(15,15,15,0.6)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  durationBadge: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    backgroundColor: "rgba(15,15,15,0.75)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  durationText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700" as const,
   },
 });

@@ -181,7 +181,7 @@ export default function CreateScreen() {
       mediaTypes: ["videos"],
       allowsEditing: true,
       videoQuality: ImagePicker.UIImagePickerControllerQualityType.High,
-      videoExportPreset: ImagePicker.VideoExportPreset.HighestQuality,
+      videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality,
     });
     if (!result.canceled && result.assets.length > 0) {
       const asset = result.assets[0];

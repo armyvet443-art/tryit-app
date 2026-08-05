@@ -1,7 +1,9 @@
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
+import { useEventListener } from "expo";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { useRouter } from "expo-router";
-import { Bookmark, Flag, Image as ImageIcon2, MapPin, MessageCircle, MoreHorizontal, Play, Share2, ShieldOff, Trash2, Pencil, Video as VideoIcon } from "lucide-react-native";
+import { Bookmark, Flag, Image as ImageIcon2, MapPin, MessageCircle, MoreHorizontal, Play, Share2, ShieldOff, Trash2, Pencil, Video as VideoIcon, Volume2, VolumeX } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -32,7 +34,120 @@ import {
   upsertReaction,
 } from "@/services/tryit-service";
 import { REACTION_META, ReactionType, TryPost } from "@/types/models";
-import { formatCount, parseMediaItems, timeAgo } from "@/utils/format";
+import { formatCount, formatDuration, parseMediaItems, timeAgo } from "@/utils/format";
+
+/**
+ * Inline video player for the feed — shows a muted autoplay loop with
+ * a sound toggle and duration badge. Tapping opens the full post detail.
+ */
+function FeedVideoTile({ url, thumbnail, onOpenDetail }: { url: string; thumbnail: string | null; onOpenDetail: () => void }) {
+  const [muted, setMuted] = useState<boolean>(true);
+  const [duration, setDuration] = useState<number>(0);
+  const player = useVideoPlayer(url, (p) => {
+    p.loop = true;
+    p.muted = true;
+    p.timeUpdateEventInterval = 0;
+  });
+
+  useEffect(() => {
+    player.muted = muted;
+  }, [muted, player]);
+
+  useEventListener(player, "statusChange", ({ status }) => {
+    if (status === "readyToPlay" && player.duration > 0) {
+      setDuration(player.duration);
+    }
+  });
+
+  useEffect(() => {
+    player.play();
+    return () => {
+      player.pause();
+    };
+  }, [player]);
+
+  return (
+    <View style={feedVideoStyles.container}>
+      <VideoView
+        player={player}
+        style={feedVideoStyles.video}
+        contentFit="cover"
+        nativeControls={false}
+        allowsFullscreen
+        allowsPictureInPicture
+      />
+      {/* Sound toggle */}
+      <TouchableOpacity
+        style={feedVideoStyles.soundBtn}
+        onPress={() => setMuted((m) => !m)}
+        testID="feed-video-sound-toggle"
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      >
+        {muted ? <VolumeX size={16} color="#FFFFFF" /> : <Volume2 size={16} color="#FFFFFF" />}
+      </TouchableOpacity>
+      {/* Duration badge */}
+      {duration > 0 ? (
+        <View style={feedVideoStyles.durationBadge}>
+          <Text style={feedVideoStyles.durationText}>{formatDuration(duration)}</Text>
+        </View>
+      ) : null}
+      {/* Tap to open detail */}
+      <TouchableOpacity
+        style={feedVideoStyles.tapLayer}
+        onPress={onOpenDetail}
+        activeOpacity={0.9}
+      />
+    </View>
+  );
+}
+
+const feedVideoStyles = StyleSheet.create({
+  container: {
+    width: "100%",
+    height: 340,
+    backgroundColor: Colors.surfaceVariant,
+    position: "relative",
+  },
+  video: {
+    width: "100%",
+    height: 340,
+  },
+  soundBtn: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(15,15,15,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 3,
+  },
+  durationBadge: {
+    position: "absolute",
+    bottom: 10,
+    left: 10,
+    backgroundColor: "rgba(15,15,15,0.75)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    zIndex: 3,
+  },
+  durationText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700" as const,
+  },
+  tapLayer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+});
 
 type ReactionCounts = Record<ReactionType, number>;
 
@@ -427,27 +542,28 @@ export default function PostCard({
           ) : null}
         </View>
       ) : post.media_url ? (
-        <TouchableOpacity activeOpacity={0.9} onPress={openDetail}>
-          <Image
-            source={{ uri: post.thumbnail_url ?? post.media_url }}
-            style={styles.media}
-            contentFit="cover"
-            transition={200}
-            onError={() => console.warn('[PostCard] media load failed for post', post.id, post.media_url)}
+        post.media_type === "video" ? (
+          <FeedVideoTile
+            url={post.media_url}
+            thumbnail={post.thumbnail_url}
+            onOpenDetail={openDetail}
           />
-          {post.media_type === "video" ? (
-            <View style={styles.playOverlay} testID={`video-play-${post.id}`}>
-              <View style={styles.playCircle}>
-                <Play size={26} color="#FFFFFF" fill="#FFFFFF" />
+        ) : (
+          <TouchableOpacity activeOpacity={0.9} onPress={openDetail}>
+            <Image
+              source={{ uri: post.thumbnail_url ?? post.media_url }}
+              style={styles.media}
+              contentFit="cover"
+              transition={200}
+              onError={() => console.warn('[PostCard] media load failed for post', post.id, post.media_url)}
+            />
+            {post.category ? (
+              <View style={styles.categoryChip}>
+                <Text style={styles.categoryText}>{post.category}</Text>
               </View>
-            </View>
-          ) : null}
-          {post.category ? (
-            <View style={styles.categoryChip}>
-              <Text style={styles.categoryText}>{post.category}</Text>
-            </View>
-          ) : null}
-        </TouchableOpacity>
+            ) : null}
+          </TouchableOpacity>
+        )
       ) : null}
 
       {/* Title & caption */}
