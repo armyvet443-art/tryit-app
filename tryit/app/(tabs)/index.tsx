@@ -14,8 +14,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import EmptyState from "@/components/EmptyState";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import PostCard from "@/components/PostCard";
 import Colors from "@/constants/colors";
+import { Sentry } from "@/lib/sentry";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   FeedType,
@@ -71,6 +73,22 @@ export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [feedType, setFeedType] = useState<FeedType>("for_you");
+
+  const onChangeTab = useCallback(
+    (tab: FeedType) => {
+      setFeedType(tab);
+      try {
+        Sentry.Native.addBreadcrumb({
+          category: "feed",
+          message: `Switched to ${tab} tab`,
+          level: "info",
+        });
+      } catch {
+        /* ignore */
+      }
+    },
+    [setFeedType],
+  );
 
   const feedQuery = useQuery<TryPost[]>({
     queryKey: ["feed", feedType, userId],
@@ -234,7 +252,7 @@ export default function FeedScreen() {
               key={tab.key}
               testID={`feed-tab-${tab.key}`}
               style={[styles.chip, active && styles.chipActive]}
-              onPress={() => setFeedType(tab.key)}
+              onPress={() => onChangeTab(tab.key)}
             >
               <Text style={[styles.chipText, active && styles.chipTextActive]}>
                 {tab.emoji} {tab.label}
@@ -244,6 +262,7 @@ export default function FeedScreen() {
         })}
       </View>
 
+      <ErrorBoundary context={`FeedScreen:${feedType}`}>
       {feedQuery.isLoading ? (
         <FlatList
           data={["skeleton-1", "skeleton-2", "skeleton-3"]}
@@ -299,6 +318,7 @@ export default function FeedScreen() {
           }
         />
       )}
+      </ErrorBoundary>
     </View>
   );
 }

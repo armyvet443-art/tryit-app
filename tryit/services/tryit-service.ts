@@ -51,42 +51,55 @@ function mapAuthor(row: Record<string, unknown> | null | undefined): AuthorProfi
   };
 }
 
-function mapPost(row: Record<string, unknown>): TryPost {
+function mapPost(row: Record<string, unknown> | null | undefined): TryPost {
+  const r = row ?? {};
   return {
-    id: String(row.id ?? ""),
-    user_id: String(row.user_id ?? ""),
-    title: String(row.title ?? ""),
-    caption: String(row.caption ?? ""),
-    media_url: String(row.media_url ?? ""),
-    media_type: String(row.media_type ?? "image"),
-    thumbnail_url: row.thumbnail_url ? String(row.thumbnail_url) : null,
-    category: String(row.category ?? ""),
-    location: String(row.location ?? ""),
-    try_score: num(row.try_score),
-    try_score_count: num(row.try_score_count),
-    must_try_count: num(row.must_try_count),
-    worth_it_count: num(row.worth_it_count),
-    maybe_count: num(row.maybe_count),
-    not_for_me_count: num(row.not_for_me_count),
-    comment_count: num(row.comment_count),
-    tried_count: num(row.tried_count),
-    likes_count: num(row.likes_count),
-    created_at: String(row.created_at ?? ""),
-    author: mapAuthor(row.user_profiles as Record<string, unknown> | null),
+    id: String(r.id ?? ""),
+    user_id: String(r.user_id ?? ""),
+    title: String(r.title ?? ""),
+    caption: String(r.caption ?? ""),
+    media_url: String(r.media_url ?? ""),
+    media_type: String(r.media_type ?? "image"),
+    thumbnail_url: r.thumbnail_url ? String(r.thumbnail_url) : null,
+    category: String(r.category ?? ""),
+    location: String(r.location ?? ""),
+    try_score: num(r.try_score),
+    try_score_count: num(r.try_score_count),
+    must_try_count: num(r.must_try_count),
+    worth_it_count: num(r.worth_it_count),
+    maybe_count: num(r.maybe_count),
+    not_for_me_count: num(r.not_for_me_count),
+    comment_count: num(r.comment_count),
+    tried_count: num(r.tried_count),
+    likes_count: num(r.likes_count),
+    created_at: String(r.created_at ?? ""),
+    author: mapAuthor(r.user_profiles as Record<string, unknown> | null),
   };
+}
+
+/** Ensure a Supabase result is an array of row objects. */
+function normalizeRows(data: unknown): Record<string, unknown>[] {
+  if (Array.isArray(data)) return data as Record<string, unknown>[];
+  if (data === null || data === undefined) return [];
+  // Some RPCs return objects instead of arrays; if it has a posts field, use that.
+  if (typeof data === "object" && !Array.isArray(data)) {
+    const maybePosts = (data as Record<string, unknown>).posts;
+    if (Array.isArray(maybePosts)) return maybePosts as Record<string, unknown>[];
+  }
+  return [];
 }
 
 /** Merge author profiles into post rows — same pattern the Flutter service used. */
 async function attachAuthors(rows: Record<string, unknown>[]): Promise<TryPost[]> {
-  if (rows.length === 0) return [];
-  const userIds = Array.from(new Set(rows.map((r) => String(r.user_id))));
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  const userIds = Array.from(new Set(rows.map((r) => String(r?.user_id))));
   const { data: profiles } = await supabase
     .from("user_profiles")
     .select("id, username, display_name, avatar_url, is_verified")
     .in("id", userIds);
   const profileMap = new Map<string, Record<string, unknown>>();
   (profiles ?? []).forEach((p: Record<string, unknown>) => profileMap.set(String(p.id), p));
-  return rows.map((r) => mapPost({ ...r, user_profiles: profileMap.get(String(r.user_id)) ?? null }));
+  return rows.map((r) => mapPost({ ...r, user_profiles: profileMap.get(String(r?.user_id)) ?? null }));
 }
 
 export async function fetchLatestPosts(offset: number, limit: number): Promise<TryPost[]> {
@@ -97,7 +110,7 @@ export async function fetchLatestPosts(offset: number, limit: number): Promise<T
  .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
     if (error) throw error;
-    return await attachAuthors((data ?? []) as Record<string, unknown>[]);
+    return await attachAuthors(normalizeRows(data));
   } catch (e) {
     console.log("[fetchLatestPosts] failed, returning []", e);
     return [];
@@ -119,7 +132,7 @@ export async function fetchFeed(
         p_feed_type: "for_you",
       });
       if (error) throw error;
-      return await attachAuthors((data ?? []) as Record<string, unknown>[]);
+      return await attachAuthors(normalizeRows(data));
     }
     if (feedType === "following" && userId) {
       const { data, error } = await supabase.rpc("get_strict_following_feed", {
@@ -128,7 +141,7 @@ export async function fetchFeed(
         p_limit: limit,
       });
       if (error) throw error;
-      return await attachAuthors((data ?? []) as Record<string, unknown>[]);
+      return await attachAuthors(normalizeRows(data));
     }
     if (feedType === "trending") {
       const { data, error } = await supabase.rpc("get_trending_posts", {
@@ -137,7 +150,7 @@ export async function fetchFeed(
         p_category: null,
       });
       if (error) throw error;
-      return await attachAuthors((data ?? []) as Record<string, unknown>[]);
+      return await attachAuthors(normalizeRows(data));
     }
     if (feedType === "following" && !userId) return [];
     return await fetchLatestPosts(offset, limit);
