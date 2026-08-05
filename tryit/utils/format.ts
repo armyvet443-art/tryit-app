@@ -71,6 +71,23 @@ export function formatDuration(seconds: number): string {
   return `${mins}:${String(secs).padStart(2, "0")}`;
 }
 
+/** Extract hashtags from a text string. Returns lowercase hashtags without the # prefix. */
+export function extractHashtags(text: string): string[] {
+  const matches = text.match(/#[\w]+/g);
+  if (!matches) return [];
+  return Array.from(new Set(matches.map((m) => m.slice(1).toLowerCase())));
+}
+
+/** Check if a search query is a hashtag search (starts with #). */
+export function isHashtagQuery(query: string): boolean {
+  return query.trim().startsWith("#");
+}
+
+/** Normalize a hashtag query — strip the # prefix and lowercase. */
+export function normalizeHashtag(query: string): string {
+  return query.trim().replace(/^#/, "").toLowerCase();
+}
+
 /** Relative time: "3h", "2d", "Just now" */
 export function timeAgo(dateString: string | null | undefined): string {
   if (!dateString) return "";

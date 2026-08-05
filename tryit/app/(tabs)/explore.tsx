@@ -25,12 +25,13 @@ import {
   filterBlockedPosts,
   getBlockedUserIds,
   getPostsByCategory,
+  searchByHashtag,
   searchPosts,
   searchUsers,
   type CategoryWithCount,
 } from "@/services/tryit-service";
 import { CATEGORIES, type AuthorProfile, type TryPost } from "@/types/models";
-import { formatCount } from "@/utils/format";
+import { formatCount, isHashtagQuery, normalizeHashtag } from "@/utils/format";
 
 type SearchMode = "posts" | "users";
 
@@ -92,7 +93,12 @@ export default function ExploreScreen() {
 
   const postResults = useQuery<TryPost[]>({
     queryKey: ["search-posts", trimmed],
-    queryFn: () => searchPosts(trimmed),
+    queryFn: () => {
+      if (isHashtagQuery(trimmed)) {
+        return searchByHashtag(normalizeHashtag(trimmed));
+      }
+      return searchPosts(trimmed);
+    },
     enabled: searching && mode === "posts",
   });
 
@@ -164,7 +170,7 @@ export default function ExploreScreen() {
         <TextInput
           testID="explore-search-input"
           style={styles.searchInput}
-          placeholder="Search Tries, categories, people..."
+          placeholder="Search Tries, #hashtags, people..."
           placeholderTextColor={Colors.inactiveIcon}
           value={query}
           onChangeText={setQuery}

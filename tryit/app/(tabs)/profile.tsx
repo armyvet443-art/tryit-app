@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { Bookmark, Grid3x3, Settings, User } from "lucide-react-native";
+import { Bookmark, Grid3x3, Globe, Instagram, Music2, Settings, User, Youtube } from "lucide-react-native";
+import * as Linking from "expo-linking";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -79,6 +80,20 @@ export default function ProfileScreen() {
 
   const tabData = activeTab === "posts" ? (postsQuery.data ?? []) : (triedQuery.data ?? []);
 
+  const openLink = (url: string) => {
+    let full = url.trim();
+    if (!full) return;
+    if (full.startsWith("@")) {
+      if (profile?.tiktok_url === url) {
+        full = `https://tiktok.com/${full}`;
+      } else {
+        full = `https://instagram.com/${full}`;
+      }
+    }
+    if (!full.startsWith("http")) full = `https://${full}`;
+    Linking.openURL(full).catch(() => {});
+  };
+
   const header = (
     <View>
       {/* Cover */}
@@ -109,6 +124,31 @@ export default function ProfileScreen() {
         </View>
         <Text style={styles.username}>@{profile.username}</Text>
         {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
+
+        {(profile.website || profile.instagram_url || profile.tiktok_url || profile.youtube_url) ? (
+          <View style={styles.socialRow}>
+            {profile.website ? (
+              <TouchableOpacity style={styles.socialIcon} onPress={() => openLink(profile.website)}>
+                <Globe size={18} color={Colors.text} />
+              </TouchableOpacity>
+            ) : null}
+            {profile.instagram_url ? (
+              <TouchableOpacity style={styles.socialIcon} onPress={() => openLink(profile.instagram_url)}>
+                <Instagram size={18} color={Colors.text} />
+              </TouchableOpacity>
+            ) : null}
+            {profile.tiktok_url ? (
+              <TouchableOpacity style={styles.socialIcon} onPress={() => openLink(profile.tiktok_url)}>
+                <Music2 size={18} color={Colors.text} />
+              </TouchableOpacity>
+            ) : null}
+            {profile.youtube_url ? (
+              <TouchableOpacity style={styles.socialIcon} onPress={() => openLink(profile.youtube_url)}>
+                <Youtube size={18} color={Colors.text} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
 
         {/* Stats */}
         <View style={styles.statsRow}>
@@ -314,6 +354,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     marginTop: 8,
+  },
+  socialRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+  },
+  socialIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
   statsRow: {
     flexDirection: "row",

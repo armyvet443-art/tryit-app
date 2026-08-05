@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/lib/supabase";
+import { registerPushToken, unregisterPushToken } from "@/services/push-service";
 import { getOrCreateGuestId, getProfile, migrateGuestData } from "@/services/tryit-service";
 // Note: migrateGuestData is now a no-op since guest voting is disabled.
 import type { UserProfile } from "@/types/models";
@@ -54,6 +55,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   // Migrate guest reactions to the user account on first login/signup.
   // Runs once per guestId+userId pair to avoid duplicate work.
+  // Also registers the push token for push notifications.
   useEffect(() => {
     if (!userId || !guestId) return;
     const migrationKey = `${guestId}:${userId}`;
@@ -67,6 +69,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         }
       })
       .catch((e) => console.log("[auth] migration failed", e));
+    // Register push token for notifications (best-effort)
+    registerPushToken(userId).catch((e) =>
+      console.log("[auth] push token registration failed", e),
+    );
   }, [userId, guestId, queryClient]);
 
   const profileQuery = useQuery<UserProfile | null>({
@@ -124,9 +130,12 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   );
 
   const signOut = useCallback(async () => {
+    if (userId) {
+      await unregisterPushToken(userId).catch(() => {});
+    }
     await supabase.auth.signOut();
     queryClient.clear();
-  }, [queryClient]);
+  }, [queryClient, userId]);
 
   const refreshProfile = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["profile", userId] });

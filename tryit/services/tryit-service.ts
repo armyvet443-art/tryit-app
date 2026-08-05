@@ -735,6 +735,10 @@ export async function getProfile(userId: string): Promise<UserProfile | null> {
     avatar_url: String(r.avatar_url ?? ""),
     cover_url: String(r.cover_url ?? ""),
     bio: String(r.bio ?? ""),
+    website: String(r.website ?? ""),
+    instagram_url: String(r.instagram_url ?? ""),
+    tiktok_url: String(r.tiktok_url ?? ""),
+    youtube_url: String(r.youtube_url ?? ""),
     is_verified: Boolean(r.is_verified),
     account_type: String(r.account_type ?? "personal"),
     followers_count: num(r.followers_count),
@@ -766,7 +770,7 @@ export async function checkUsernameAvailable(username: string, currentUserId: st
 
 export async function updateProfile(
   userId: string,
-  updates: Partial<Pick<UserProfile, "display_name" | "username" | "bio" | "avatar_url" | "cover_url">>,
+  updates: Partial<Pick<UserProfile, "display_name" | "username" | "bio" | "avatar_url" | "cover_url" | "website" | "instagram_url" | "tiktok_url" | "youtube_url">>,
 ): Promise<void> {
   const { error } = await supabase
     .from("user_profiles")
@@ -850,6 +854,21 @@ export async function searchPosts(query: string): Promise<TryPost[]> {
     .from("posts")
     .select("*")
     .or(`title.ilike.%${q}%,caption.ilike.%${q}%,category.ilike.%${q}%`)
+    .order("created_at", { ascending: false })
+    .limit(30);
+  if (error) throw error;
+  return attachAuthors((data ?? []) as Record<string, unknown>[]);
+}
+
+/** Search posts by hashtag. The query should be the hashtag without the # prefix. */
+export async function searchByHashtag(tag: string): Promise<TryPost[]> {
+  const q = tag.trim().toLowerCase().replace(/^#/, "");
+  if (q.length === 0) return [];
+  // Search for #hashtag in title and caption text
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .or(`title.ilike.%#${q}%,caption.ilike.%#${q}%`)
     .order("created_at", { ascending: false })
     .limit(30);
   if (error) throw error;
@@ -958,7 +977,8 @@ export async function deleteNotification(notificationId: string): Promise<void> 
   }
 }
 
-/** Create a notification. Skips if actor === recipient (don't notify yourself). */
+/** Create a notification. Skips if actor === recipient (don't notify yourself).
+ *  Also sends a push notification to the recipient's devices (best-effort). */
 export async function createNotification(input: {
   recipientId: string;
   actorId: string | null;
@@ -982,6 +1002,22 @@ export async function createNotification(input: {
   if (error) {
     console.log("[createNotification] error", error.message);
     // Best-effort — don't throw, notifications are non-critical
+  }
+
+  // Best-effort: send a push notification to the recipient's devices.
+  // Lazy import to avoid circular dependency at module load time.
+  try {
+    const { sendPushNotification } = await import("@/services/push-service");
+    const pushData: Record<string, unknown> = { type: input.type };
+    if (input.postId) pushData.postId = input.postId;
+    if (input.actorId) pushData.actorId = input.actorId;
+    await sendPushNotification(input.recipientId, {
+      title: "TryIt 🔥",
+      body: input.message,
+      data: pushData,
+    });
+  } catch (e) {
+    console.log("[createNotification] push send failed", e);
   }
 }
 

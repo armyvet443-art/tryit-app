@@ -39,6 +39,10 @@ export interface UserProfile {
   avatar_url: string;
   cover_url: string;
   bio: string;
+  website: string;
+  instagram_url: string;
+  tiktok_url: string;
+  youtube_url: string;
   is_verified: boolean;
   account_type: string;
   followers_count: number;

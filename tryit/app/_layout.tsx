@@ -1,16 +1,20 @@
 import { useFonts } from "@expo-google-fonts/sora";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import * as Notifications from "expo-notifications";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import Colors from "@/constants/colors";
 import { fontMap } from "@/constants/typography";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { configureNotifications } from "@/services/push-service";
 
 SplashScreen.preventAutoHideAsync();
+
+configureNotifications();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,6 +26,28 @@ const queryClient = new QueryClient({
 });
 
 function RootLayoutNav() {
+  const router = useRouter();
+  const responseListener = useRef<Notifications.Subscription | null>(null);
+
+  useEffect(() => {
+    // Listen for notification taps and deep-link to the relevant screen.
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = response.notification.request.content.data as Record<string, unknown>;
+        const postId = data?.postId ? String(data.postId) : null;
+        const actorId = data?.actorId ? String(data.actorId) : null;
+        if (postId) {
+          router.push({ pathname: "/post/[id]", params: { id: postId } });
+        } else if (actorId) {
+          router.push({ pathname: "/user/[id]", params: { id: actorId } });
+        }
+      },
+    );
+    return () => {
+      responseListener.current?.remove();
+    };
+  }, [router]);
+
   return (
     <Stack
       screenOptions={{
