@@ -1008,6 +1008,13 @@ export async function createNotification(input: {
   // Lazy import to avoid circular dependency at module load time.
   try {
     const { sendPushNotification } = await import("@/services/push-service");
+    const pushType =
+      input.type === "fire" ? "fires" :
+      input.type === "comment" ? "comments" :
+      input.type === "follow" ? "follows" :
+      input.type === "tried" ? "tries" :
+      input.type === "reaction" || input.type === "must_try" || input.type === "worth_it" || input.type === "maybe" || input.type === "not_for_me" ? "reactions" :
+      undefined;
     const pushData: Record<string, unknown> = { type: input.type };
     if (input.postId) pushData.postId = input.postId;
     if (input.actorId) pushData.actorId = input.actorId;
@@ -1015,6 +1022,7 @@ export async function createNotification(input: {
       title: "TryIt 🔥",
       body: input.message,
       data: pushData,
+      type: pushType as any,
     });
   } catch (e) {
     console.log("[createNotification] push send failed", e);

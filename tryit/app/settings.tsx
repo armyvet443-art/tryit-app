@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import {
+  Bell,
   ChevronRight,
   FileText,
   Info,
@@ -10,12 +11,13 @@ import {
   Trash2,
   UserPen,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -24,6 +26,11 @@ import {
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { deleteAccount } from "@/services/tryit-service";
+import {
+  getPushPrefs,
+  setPushPrefs,
+  type NotificationType,
+} from "@/services/push-service";
 
 interface RowProps {
   icon: React.ReactNode;
@@ -42,10 +49,58 @@ function SettingsRow({ icon, label, onPress, destructive = false }: RowProps) {
   );
 }
 
+interface ToggleRowProps {
+  label: string;
+  description: string;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+}
+
+function ToggleRow({ label, description, value, onValueChange }: ToggleRowProps) {
+  return (
+    <View style={styles.toggleRow}>
+      <View style={styles.toggleText}>
+        <Text style={styles.toggleLabel}>{label}</Text>
+        <Text style={styles.toggleDesc}>{description}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: Colors.border, true: Colors.flameOrange }}
+        thumbColor="#FFFFFF"
+      />
+    </View>
+  );
+}
+
 export default function SettingsScreen() {
   const { userId, profile, signOut, sendPasswordReset } = useAuth();
   const router = useRouter();
   const [busy, setBusy] = useState<boolean>(false);
+  const [pushPrefs, setPushPrefsState] = useState<Record<NotificationType, boolean>>({
+    reactions: true,
+    comments: true,
+    follows: true,
+    tries: true,
+    fires: true,
+  });
+  const [prefsLoaded, setPrefsLoaded] = useState<boolean>(false);
+
+  useEffect(() => {
+    getPushPrefs().then((prefs) => {
+      setPushPrefsState(prefs);
+      setPrefsLoaded(true);
+    });
+  }, []);
+
+  const togglePref = useCallback(
+    (type: NotificationType, value: boolean) => {
+      const next = { ...pushPrefs, [type]: value };
+      setPushPrefsState(next);
+      setPushPrefs(next);
+    },
+    [pushPrefs],
+  );
 
   const handleChangePassword = async () => {
     if (!profile?.email) return;
@@ -116,6 +171,52 @@ export default function SettingsScreen() {
           label="Change Password"
           onPress={handleChangePassword}
         />
+      </View>
+
+      <Text style={styles.sectionHeader}>NOTIFICATIONS</Text>
+      <View style={styles.section}>
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleText}>
+            <Text style={styles.toggleLabel}>Push Notifications</Text>
+            <Text style={styles.toggleDesc}>Get notified on this device</Text>
+          </View>
+          <Bell size={20} color={Colors.flameOrange} />
+        </View>
+        {prefsLoaded ? (
+          <>
+            <View style={styles.divider} />
+            <ToggleRow
+              label="Fires"
+              description="When someone fires your post"
+              value={pushPrefs.fires}
+              onValueChange={(v) => togglePref("fires", v)}
+            />
+            <ToggleRow
+              label="Reactions"
+              description="Must Try, Worth It, Maybe, Not for Me"
+              value={pushPrefs.reactions}
+              onValueChange={(v) => togglePref("reactions", v)}
+            />
+            <ToggleRow
+              label="Comments"
+              description="When someone comments on your post"
+              value={pushPrefs.comments}
+              onValueChange={(v) => togglePref("comments", v)}
+            />
+            <ToggleRow
+              label="Follows"
+              description="When someone follows you"
+              value={pushPrefs.follows}
+              onValueChange={(v) => togglePref("follows", v)}
+            />
+            <ToggleRow
+              label="I Tried This"
+              description="When someone tries your post"
+              value={pushPrefs.tries}
+              onValueChange={(v) => togglePref("tries", v)}
+            />
+          </>
+        ) : null}
       </View>
 
       <Text style={styles.sectionHeader}>SAFETY</Text>
@@ -226,6 +327,33 @@ const styles = StyleSheet.create({
   },
   rowLabelDestructive: {
     color: Colors.error,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 52,
+  },
+  toggleText: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  toggleLabel: {
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: "500" as const,
+  },
+  toggleDesc: {
+    color: Colors.mutedText,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
+    marginHorizontal: 14,
   },
   busyOverlay: {
     paddingVertical: 24,

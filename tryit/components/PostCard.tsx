@@ -20,6 +20,7 @@ import {
 } from "react-native";
 
 import Avatar from "@/components/Avatar";
+import CaptionText from "@/components/CaptionText";
 import FollowButton from "@/components/FollowButton";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
@@ -571,11 +572,13 @@ export default function PostCard({
         <Text style={styles.title}>{post.title}</Text>
       </TouchableOpacity>
       {post.caption ? (
-        <TouchableOpacity onPress={() => setExpanded((e) => !e)} activeOpacity={0.8}>
-          <Text style={styles.caption} numberOfLines={expanded ? undefined : 2}>
-            {post.caption}
-          </Text>
-        </TouchableOpacity>
+        <CaptionText
+          text={post.caption}
+          expanded={expanded}
+          onToggleExpand={() => setExpanded((e) => !e)}
+          style={styles.caption}
+          numberOfLines={expanded ? undefined : 2}
+        />
       ) : null}
       {post.location ? (
         <View style={styles.locationRow}>

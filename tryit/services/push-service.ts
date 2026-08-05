@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
@@ -15,6 +16,49 @@ import { supabase } from "@/lib/supabase";
  */
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+
+const PUSH_PREFS_KEY = "tryit_push_prefs";
+
+export type NotificationType = "reactions" | "comments" | "follows" | "tries" | "fires";
+
+interface PushPrefs {
+  reactions: boolean;
+  comments: boolean;
+  follows: boolean;
+  tries: boolean;
+  fires: boolean;
+}
+
+const DEFAULT_PREFS: PushPrefs = {
+  reactions: true,
+  comments: true,
+  follows: true,
+  tries: true,
+  fires: true,
+};
+
+/** Load push notification preferences from AsyncStorage. */
+export async function getPushPrefs(): Promise<PushPrefs> {
+  try {
+    const raw = await AsyncStorage.getItem(PUSH_PREFS_KEY);
+    if (!raw) return DEFAULT_PREFS;
+    const parsed = JSON.parse(raw) as Partial<PushPrefs>;
+    return { ...DEFAULT_PREFS, ...parsed };
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
+
+/** Save push notification preferences to AsyncStorage. */
+export async function setPushPrefs(prefs: PushPrefs): Promise<void> {
+  await AsyncStorage.setItem(PUSH_PREFS_KEY, JSON.stringify(prefs));
+}
+
+/** Check if a specific notification type is enabled. */
+export async function isNotificationEnabled(type: NotificationType): Promise<boolean> {
+  const prefs = await getPushPrefs();
+  return prefs[type];
+}
 
 /** Request notification permissions. Returns true if granted. */
 export async function requestNotificationPermission(): Promise<boolean> {
@@ -114,6 +158,7 @@ interface PushPayload {
   title: string;
   body: string;
   data?: Record<string, unknown>;
+  type?: NotificationType;
 }
 
 /** Send a push notification to a user via Expo Push API. Best-effort. */
@@ -121,6 +166,10 @@ export async function sendPushNotification(
   recipientId: string,
   payload: PushPayload,
 ): Promise<void> {
+  if (payload.type) {
+    const enabled = await isNotificationEnabled(payload.type);
+    if (!enabled) return;
+  }
   const tokens = await getPushTokensForUser(recipientId);
   if (tokens.length === 0) return;
 

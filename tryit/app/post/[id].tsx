@@ -21,6 +21,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Avatar from "@/components/Avatar";
+import CaptionText from "@/components/CaptionText";
 import CommentThread, { buildCommentTree } from "@/components/CommentThread";
 import EmptyState from "@/components/EmptyState";
 import FollowButton from "@/components/FollowButton";
@@ -611,7 +612,7 @@ export default function PostDetailScreen() {
 
         {/* Title & caption */}
         <Text style={styles.title}>{post.title}</Text>
-        {post.caption ? <Text style={styles.caption}>{post.caption}</Text> : null}
+        {post.caption ? <CaptionText text={post.caption} style={styles.caption} /> : null}
         {post.location ? (
           <View style={styles.locationRow}>
             <Text style={styles.locationText}>📍 {post.location}</Text>
