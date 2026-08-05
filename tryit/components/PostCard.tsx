@@ -4,7 +4,7 @@ import { useEventListener } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useRouter } from "expo-router";
 import { Bookmark, Flag, Image as ImageIcon2, MapPin, MessageCircle, MoreHorizontal, Play, Share2, ShieldOff, Trash2, Pencil, Video as VideoIcon, Volume2, VolumeX } from "lucide-react-native";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -41,9 +41,20 @@ import { formatCount, formatDuration, parseMediaItems, timeAgo } from "@/utils/f
  * Inline video player for the feed — shows a muted autoplay loop with
  * a sound toggle and duration badge. Tapping opens the full post detail.
  */
+/** Safely call a video player method — swallows NativeSharedObjectNotFoundException
+ *  that fires when the native player has already been released during unmount. */
+function safePlayerCall(fn: () => void): void {
+  try {
+    fn();
+  } catch {
+    // Native player object already released — safe to ignore during unmount/tab switch.
+  }
+}
+
 function FeedVideoTile({ url, thumbnail, onOpenDetail }: { url: string; thumbnail: string | null; onOpenDetail: () => void }) {
   const [muted, setMuted] = useState<boolean>(true);
   const [duration, setDuration] = useState<number>(0);
+  const mountedRef = useRef<boolean>(true);
   const player = useVideoPlayer(url, (p) => {
     p.loop = true;
     p.muted = true;
@@ -51,20 +62,34 @@ function FeedVideoTile({ url, thumbnail, onOpenDetail }: { url: string; thumbnai
   });
 
   useEffect(() => {
-    player.muted = muted;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      safePlayerCall(() => player.pause());
+    };
+  }, [player]);
+
+  useEffect(() => {
+    if (!mountedRef.current) return;
+    safePlayerCall(() => {
+      player.muted = muted;
+    });
   }, [muted, player]);
 
   useEventListener(player, "statusChange", ({ status }) => {
-    if (status === "readyToPlay" && player.duration > 0) {
-      setDuration(player.duration);
+    if (!mountedRef.current) return;
+    try {
+      if (status === "readyToPlay" && player.duration > 0) {
+        setDuration(player.duration);
+      }
+    } catch {
+      /* player released */
     }
   });
 
   useEffect(() => {
-    player.play();
-    return () => {
-      player.pause();
-    };
+    if (!mountedRef.current) return;
+    safePlayerCall(() => player.play());
   }, [player]);
 
   return (

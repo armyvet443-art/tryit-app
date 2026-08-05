@@ -26,30 +26,58 @@ interface MediaCarouselProps {
   onOpenDetail?: () => void;
 }
 
+/** Safely call a video player method — swallows NativeSharedObjectNotFoundException
+ *  that fires when the native player has already been released during unmount. */
+function safePlayerCall(fn: () => void): void {
+  try {
+    fn();
+  } catch {
+    // Native player object already released — safe to ignore during unmount/tab switch.
+  }
+}
+
 /** Single video tile — expo-video with autoplay muted loop, sound toggle, duration. */
 function VideoTile({ item, active }: { item: MediaItem; active: boolean }) {
   const [muted, setMuted] = useState<boolean>(true);
   const [duration, setDuration] = useState<number>(0);
+  const mountedRef = useRef<boolean>(true);
   const player = useVideoPlayer(item.url, (p) => {
     p.loop = true;
     p.muted = true;
   });
 
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      safePlayerCall(() => player.pause());
+    };
+  }, [player]);
+
+  useEffect(() => {
+    if (!mountedRef.current) return;
     if (active) {
-      player.play();
+      safePlayerCall(() => player.play());
     } else {
-      player.pause();
+      safePlayerCall(() => player.pause());
     }
   }, [active, player]);
 
   useEffect(() => {
-    player.muted = muted;
+    if (!mountedRef.current) return;
+    safePlayerCall(() => {
+      player.muted = muted;
+    });
   }, [muted, player]);
 
   useEventListener(player, "statusChange", ({ status }) => {
-    if (status === "readyToPlay" && player.duration > 0) {
-      setDuration(player.duration);
+    if (!mountedRef.current) return;
+    try {
+      if (status === "readyToPlay" && player.duration > 0) {
+        setDuration(player.duration);
+      }
+    } catch {
+      /* player released */
     }
   });
 

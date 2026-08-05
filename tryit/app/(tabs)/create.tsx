@@ -7,7 +7,7 @@ import { File } from "expo-file-system";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { useRouter } from "expo-router";
 import { Camera, Crop, ImageIcon, ImagePlus, Play, Video as VideoIcon, X } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -47,22 +47,34 @@ function VideoPreviewSlot({
   onEnd: () => void;
   onRemove: () => void;
 }) {
+  const mountedRef = useRef<boolean>(true);
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false;
     p.muted = false;
   });
 
   useEffect(() => {
-    if (playing) {
-      player.play();
-    } else {
-      player.pause();
-    }
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      try { player.pause(); } catch { /* player released */ }
+    };
+  }, [player]);
+
+  useEffect(() => {
+    if (!mountedRef.current) return;
+    try {
+      if (playing) {
+        player.play();
+      } else {
+        player.pause();
+      }
+    } catch { /* player released */ }
   }, [playing, player]);
 
   // Show the play button again when playback ends
   useEventListener(player, "playToEnd", () => {
-    onEnd();
+    if (mountedRef.current) onEnd();
   });
 
   return (
