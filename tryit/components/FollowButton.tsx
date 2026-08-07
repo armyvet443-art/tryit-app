@@ -1,7 +1,14 @@
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity } from "react-native";
+import React, { useCallback, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+} from "react-native";
 
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
@@ -14,33 +21,81 @@ interface FollowButtonProps {
   compact?: boolean;
 }
 
-export default function FollowButton({ targetUserId, isFollowing, onChanged, compact = false }: FollowButtonProps) {
+export default function FollowButton({
+  targetUserId,
+  isFollowing,
+  onChanged,
+  compact = false,
+}: FollowButtonProps) {
   const { userId } = useAuth();
   const router = useRouter();
   const [following, setFollowingState] = useState<boolean>(isFollowing);
   const [busy, setBusy] = useState<boolean>(false);
+  const busyRef = useRef<boolean>(false);
 
+  // Don't render on own posts
   if (userId === targetUserId) return null;
 
-  const handlePress = async () => {
+  // Debounce — prevent duplicate calls from fast repeated taps
+  const handlePress = useCallback(async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+
     if (!userId) {
       router.push("/auth/login");
+      busyRef.current = false;
+      setBusy(false);
       return;
     }
+
+    // If already following, show unfollow confirmation sheet
+    if (following) {
+      Alert.alert(
+        "Unfollow?",
+        `Are you sure you want to unfollow?`,
+        [
+          { text: "Cancel", style: "cancel", onPress: () => {
+            busyRef.current = false;
+            setBusy(false);
+          } },
+          {
+            text: "Unfollow",
+            style: "destructive",
+            onPress: async () => {
+              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setFollowingState(false);
+              try {
+                await setFollowing(userId, targetUserId, false);
+                onChanged?.(false);
+              } catch (e) {
+                console.log("[follow] unfollow failed", e);
+                setFollowingState(true);
+              } finally {
+                busyRef.current = false;
+                setBusy(false);
+              }
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    // Follow — optimistic
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const next = !following;
-    setFollowingState(next);
-    setBusy(true);
+    setFollowingState(true);
     try {
-      await setFollowing(userId, targetUserId, next);
-      onChanged?.(next);
+      await setFollowing(userId, targetUserId, true);
+      onChanged?.(true);
     } catch (e) {
       console.log("[follow] failed", e);
-      setFollowingState(!next);
+      setFollowingState(false);
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
-  };
+  }, [userId, targetUserId, following, onChanged, router]);
 
   return (
     <TouchableOpacity

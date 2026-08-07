@@ -751,8 +751,10 @@ export default function PostDetailScreen() {
           value={commentText}
           onChangeText={setCommentText}
           maxLength={280}
+          autoFocus={false}
           onFocus={() => {
             if (!userId) {
+              inputRef.current?.blur();
               setShowLoginModal(true);
             }
           }}

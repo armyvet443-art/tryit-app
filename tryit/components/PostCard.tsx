@@ -3,7 +3,7 @@ import { Image } from "expo-image";
 import { useEventListener } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useRouter } from "expo-router";
-import { Bookmark, Flag, Image as ImageIcon2, MapPin, MessageCircle, MoreHorizontal, Play, Share2, ShieldOff, Trash2, Pencil, Video as VideoIcon, Volume2, VolumeX } from "lucide-react-native";
+import { Bookmark, Flag, Image as ImageIcon2, MapPin, MessageCircle, MoreHorizontal, Play, Share2, ShieldOff, Trash2, Pencil, Video as VideoIcon, Volume2, VolumeX, X } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 import Avatar from "@/components/Avatar";
 import CaptionText from "@/components/CaptionText";
@@ -34,7 +35,7 @@ import {
   toggleFire,
   upsertReaction,
 } from "@/services/tryit-service";
-import { REACTION_META, ReactionType, TryPost } from "@/types/models";
+import { REACTION_META, ReactionType, TryPost, MediaItem } from "@/types/models";
 import { formatCount, formatDuration, parseMediaItems, timeAgo } from "@/utils/format";
 
 /**
@@ -51,9 +52,10 @@ function safePlayerCall(fn: () => void): void {
   }
 }
 
-function FeedVideoTile({ url, thumbnail, onOpenDetail, inView }: { url: string; thumbnail: string | null; onOpenDetail: () => void; inView: boolean }) {
+function FeedVideoTile({ url, onDoubleTap, inView }: { url: string; onDoubleTap: () => void; inView: boolean }) {
   const [muted, setMuted] = useState<boolean>(true);
   const [duration, setDuration] = useState<number>(0);
+  const [userPaused, setUserPaused] = useState<boolean>(false);
   const mountedRef = useRef<boolean>(true);
   const player = useVideoPlayer(url, (p) => {
     p.loop = true;
@@ -69,15 +71,19 @@ function FeedVideoTile({ url, thumbnail, onOpenDetail, inView }: { url: string; 
     };
   }, [player]);
 
-  // Only play when the card is actually visible on screen — pause when scrolled away.
+  // Play when in view and not user-paused; pause otherwise.
+  // Reset userPaused when scrolling away so it auto-plays on return.
   useEffect(() => {
     if (!mountedRef.current) return;
-    if (inView) {
+    if (!inView) {
+      setUserPaused(false);
+      safePlayerCall(() => player.pause());
+    } else if (!userPaused) {
       safePlayerCall(() => player.play());
     } else {
       safePlayerCall(() => player.pause());
     }
-  }, [inView, player]);
+  }, [inView, userPaused, player]);
 
   useEffect(() => {
     if (!mountedRef.current) return;
@@ -97,16 +103,43 @@ function FeedVideoTile({ url, thumbnail, onOpenDetail, inView }: { url: string; 
     }
   });
 
+  // Single tap = toggle play/pause; double tap = fire
+  const singleTap = Gesture.Tap()
+    .runOnJS(true)
+    .onStart(() => {
+      setUserPaused((prev) => !prev);
+    });
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .runOnJS(true)
+    .onStart(() => {
+      onDoubleTap();
+    });
+
+  const composed = Gesture.Exclusive(doubleTap, singleTap);
+
   return (
     <View style={feedVideoStyles.container}>
-      <VideoView
-        player={player}
-        style={feedVideoStyles.video}
-        contentFit="cover"
-        nativeControls={false}
-        allowsFullscreen
-        allowsPictureInPicture
-      />
+      <GestureDetector gesture={composed}>
+        <View style={feedVideoStyles.videoWrap}>
+          <VideoView
+            player={player}
+            style={feedVideoStyles.video}
+            contentFit="cover"
+            nativeControls={false}
+            allowsFullscreen
+            allowsPictureInPicture
+          />
+          {userPaused ? (
+            <View style={feedVideoStyles.pauseOverlay} pointerEvents="none">
+              <View style={feedVideoStyles.playCircle}>
+                <Play size={28} color="#FFFFFF" fill="#FFFFFF" />
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </GestureDetector>
       {/* Sound toggle */}
       <TouchableOpacity
         style={feedVideoStyles.soundBtn}
@@ -122,12 +155,6 @@ function FeedVideoTile({ url, thumbnail, onOpenDetail, inView }: { url: string; 
           <Text style={feedVideoStyles.durationText}>{formatDuration(duration)}</Text>
         </View>
       ) : null}
-      {/* Tap to open detail */}
-      <TouchableOpacity
-        style={feedVideoStyles.tapLayer}
-        onPress={onOpenDetail}
-        activeOpacity={0.9}
-      />
     </View>
   );
 }
@@ -139,9 +166,33 @@ const feedVideoStyles = StyleSheet.create({
     backgroundColor: Colors.surfaceVariant,
     position: "relative",
   },
+  videoWrap: {
+    width: "100%",
+    height: 340,
+  },
   video: {
     width: "100%",
     height: 340,
+  },
+  pauseOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.25)",
+  },
+  playCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(15,15,15,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.3)",
   },
   soundBtn: {
     position: "absolute",
@@ -170,13 +221,94 @@ const feedVideoStyles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700" as const,
   },
-  tapLayer: {
+});
+
+/** Compose single-tap (open fullscreen) + double-tap (fire) gestures for images. */
+function composeImageGestures(onDoubleTap: () => void, onSingleTap: () => void) {
+  const singleTap = Gesture.Tap().runOnJS(true).onStart(onSingleTap);
+  const doubleTap = Gesture.Tap().numberOfTaps(2).runOnJS(true).onStart(onDoubleTap);
+  return Gesture.Exclusive(doubleTap, singleTap);
+}
+
+/** Single collage slot with gesture-based single (fullscreen) + double (fire) tap. */
+function CollageSlot({
+  item,
+  onSingleTap,
+  onDoubleTap,
+}: {
+  item: MediaItem;
+  onSingleTap: () => void;
+  onDoubleTap: () => void;
+}) {
+  const gesture = composeImageGestures(onDoubleTap, onSingleTap);
+  return (
+    <GestureDetector gesture={gesture}>
+      <View style={collageSlotStyles.slot}>
+        <Image
+          source={{ uri: item.thumbnail ?? item.url }}
+          style={collageSlotStyles.media}
+          contentFit="cover"
+          transition={200}
+          onError={() => console.warn("[PostCard] collage media load failed", item.url)}
+        />
+        {item.type === "video" ? (
+          <View style={collageSlotStyles.playOverlay} pointerEvents="none">
+            <View style={collageSlotStyles.playCircle}>
+              <Play size={18} color="#FFFFFF" fill="#FFFFFF" />
+            </View>
+          </View>
+        ) : null}
+        <View style={collageSlotStyles.badge} pointerEvents="none">
+          {item.type === "video" ? (
+            <VideoIcon size={10} color="#FFFFFF" />
+          ) : (
+            <ImageIcon2 size={10} color="#FFFFFF" />
+          )}
+        </View>
+      </View>
+    </GestureDetector>
+  );
+}
+
+const collageSlotStyles = StyleSheet.create({
+  slot: {
+    flex: 1,
+    position: "relative",
+  },
+  media: {
+    width: "100%",
+    height: 280,
+    backgroundColor: Colors.surfaceVariant,
+  },
+  playOverlay: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(15,15,15,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  badge: {
+    position: "absolute",
+    bottom: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(15,15,15,0.8)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
 
@@ -251,8 +383,9 @@ export default function PostCard({
   const [fireCountState, setFireCountState] = useState<number>(fireCount);
   const fireScale = React.useRef(new Animated.Value(1)).current;
   const reactionScale = React.useRef(new Animated.Value(1)).current;
-  const lastTapRef = useRef<number>(0);
   const heartAnim = React.useRef(new Animated.Value(0)).current;
+  const fireBusyRef = useRef<boolean>(false);
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
   useEffect(() => setReaction(myReaction), [myReaction]);
   useEffect(() => setIsTried(tried), [tried]);
@@ -342,8 +475,11 @@ export default function PostCard({
   }, [isSaved, post.id, userId, router]);
 
   const handleFire = useCallback(async () => {
+    if (fireBusyRef.current) return;
+    fireBusyRef.current = true;
     if (!userId) {
       setShowLoginModal(true);
+      fireBusyRef.current = false;
       return;
     }
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -362,8 +498,20 @@ export default function PostCard({
       console.log("[fire] toggle failed", { postId: post.id, userId, error: msg });
       setIsFired(!next);
       setFireCountState((c) => Math.max(0, c + (next ? -1 : 1)));
+    } finally {
+      fireBusyRef.current = false;
     }
   }, [isFired, fireScale, post.id, userId]);
+
+  /** Double-tap on media — triggers Fire + heart pop animation. */
+  const handleDoubleTapFire = useCallback(() => {
+    handleFire();
+    heartAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(heartAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+      Animated.timing(heartAnim, { toValue: 0, duration: 600, delay: 200, useNativeDriver: true }),
+    ]).start();
+  }, [handleFire, heartAnim]);
 
   const [isSharePressed, setIsSharePressed] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
@@ -541,89 +689,19 @@ export default function PostCard({
       {mediaItems.length > 1 ? (
         <View style={styles.collageRow}>
           {mediaItems.map((item, i) => (
-            <TouchableOpacity
+            <CollageSlot
               key={item.url + i}
-              activeOpacity={0.9}
-              onPress={openDetail}
-              style={styles.collageSlot}
-            >
-              <Image
-                source={{ uri: item.thumbnail ?? item.url }}
-                style={styles.collageMedia}
-                contentFit="cover"
-                transition={200}
-                onError={() => console.warn('[PostCard] media load failed for post', post.id, item.url)}
-              />
-              {item.type === "video" ? (
-                <View style={styles.playOverlaySmall}>
-                  <View style={styles.playCircleSmall}>
-                    <Play size={18} color="#FFFFFF" fill="#FFFFFF" />
-                  </View>
-                </View>
-              ) : null}
-              <View style={styles.collageBadge}>
-                {item.type === "video" ? (
-                  <VideoIcon size={10} color="#FFFFFF" />
-                ) : (
-                  <ImageIcon2 size={10} color="#FFFFFF" />
-                )}
-              </View>
-            </TouchableOpacity>
+              item={item}
+              onSingleTap={() => setFullscreenImage(item.thumbnail ?? item.url)}
+              onDoubleTap={handleDoubleTapFire}
+            />
           ))}
           {post.category ? (
             <View style={styles.categoryChip}>
               <Text style={styles.categoryText}>{post.category}</Text>
             </View>
           ) : null}
-        </View>
-      ) : post.media_url ? (
-        post.media_type === "video" ? (
-          <FeedVideoTile
-            url={post.media_url}
-            thumbnail={post.thumbnail_url}
-            onOpenDetail={openDetail}
-            inView={inView}
-          />
-        ) : (
-          <TouchableOpacity activeOpacity={0.9} onPress={openDetail}>
-            <Image
-              source={{ uri: post.thumbnail_url ?? post.media_url }}
-              style={styles.media}
-              contentFit="cover"
-              transition={200}
-              onError={() => console.warn('[PostCard] media load failed for post', post.id, post.media_url)}
-            />
-            {post.category ? (
-              <View style={styles.categoryChip}>
-                <Text style={styles.categoryText}>{post.category}</Text>
-              </View>
-            ) : null}
-          </TouchableOpacity>
-        )
-      ) : null}
-
-      {/* Double-tap to fire overlay — sits above the media area */}
-      {post.media_url ? (
-        <View
-          style={styles.doubleTapLayer}
-          onStartShouldSetResponder={() => true}
-          onResponderGrant={(e) => {
-            const now = Date.now();
-            if (now - lastTapRef.current < 300) {
-              // Double tap — fire!
-              handleFire();
-              // Heart pop animation
-              heartAnim.setValue(0);
-              Animated.sequence([
-                Animated.timing(heartAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
-                Animated.timing(heartAnim, { toValue: 0, duration: 600, delay: 200, useNativeDriver: true }),
-              ]).start();
-              lastTapRef.current = 0;
-            } else {
-              lastTapRef.current = now;
-            }
-          }}
-        >
+          {/* Heart pop overlay for double-tap fire */}
           <Animated.View
             pointerEvents="none"
             style={[
@@ -639,12 +717,67 @@ export default function PostCard({
             <Text style={styles.heartPopEmoji}>🔥</Text>
           </Animated.View>
         </View>
+      ) : post.media_url ? (
+        post.media_type === "video" ? (
+          <View style={styles.mediaWrapRelative}>
+            <FeedVideoTile
+              url={post.media_url}
+              onDoubleTap={handleDoubleTapFire}
+              inView={inView}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.heartPop,
+                {
+                  opacity: heartAnim,
+                  transform: [
+                    { scale: heartAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.5, 1.2, 1] }) },
+                  ],
+                },
+              ]}
+            >
+              <Text style={styles.heartPopEmoji}>🔥</Text>
+            </Animated.View>
+          </View>
+        ) : (
+          <View style={styles.mediaWrapRelative}>
+            <GestureDetector gesture={composeImageGestures(handleDoubleTapFire, () => setFullscreenImage(post.thumbnail_url ?? post.media_url))}>
+              <View style={styles.imageGestureWrap}>
+                <Image
+                  source={{ uri: post.thumbnail_url ?? post.media_url }}
+                  style={styles.media}
+                  contentFit="cover"
+                  transition={200}
+                  onError={() => console.warn('[PostCard] media load failed for post', post.id, post.media_url)}
+                />
+                {post.category ? (
+                  <View style={styles.categoryChip}>
+                    <Text style={styles.categoryText}>{post.category}</Text>
+                  </View>
+                ) : null}
+              </View>
+            </GestureDetector>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.heartPop,
+                {
+                  opacity: heartAnim,
+                  transform: [
+                    { scale: heartAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.5, 1.2, 1] }) },
+                  ],
+                },
+              ]}
+            >
+              <Text style={styles.heartPopEmoji}>🔥</Text>
+            </Animated.View>
+          </View>
+        )
       ) : null}
 
       {/* Title & caption */}
-      <TouchableOpacity onPress={openDetail} activeOpacity={0.8}>
-        <Text style={styles.title}>{post.title}</Text>
-      </TouchableOpacity>
+      <Text style={styles.title}>{post.title}</Text>
       {post.caption ? (
         <CaptionText
           text={post.caption}
@@ -915,6 +1048,32 @@ export default function PostCard({
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Fullscreen image viewer */}
+      <Modal
+        visible={fullscreenImage !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFullscreenImage(null)}
+      >
+        <View style={styles.fullscreenOverlay}>
+          <TouchableOpacity
+            style={styles.fullscreenClose}
+            onPress={() => setFullscreenImage(null)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <X size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+          {fullscreenImage ? (
+            <Image
+              source={{ uri: fullscreenImage }}
+              style={styles.fullscreenImage}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+            />
+          ) : null}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1063,13 +1222,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  doubleTapLayer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
+  mediaWrapRelative: {
+    position: "relative",
+  },
+  imageGestureWrap: {
+    width: "100%",
     height: 340,
-    zIndex: 0,
   },
   heartPop: {
     position: "absolute",
@@ -1356,5 +1514,21 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "800" as const,
+  },
+  fullscreenOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fullscreenClose: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 10,
+  },
+  fullscreenImage: {
+    width: "100%",
+    height: "80%",
   },
 });
