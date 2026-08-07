@@ -678,9 +678,10 @@ export default function PostCard({
             style={styles.menuButton}
             onPress={() => setMenuVisible(true)}
             testID={`post-menu-${post.id}`}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+            pressRetentionOffset={{ top: 20, bottom: 20, left: 20, right: 20 }}
           >
-            <MoreHorizontal size={22} color={Colors.mutedText} />
+            <MoreHorizontal size={24} color={Colors.mutedText} />
           </TouchableOpacity>
         </View>
       </View>
@@ -1102,7 +1103,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   menuButton: {
-    padding: 6,
+    padding: 8,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   menuOverlay: {
     flex: 1,

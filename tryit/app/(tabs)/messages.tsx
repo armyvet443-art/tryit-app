@@ -1,12 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React from "react";
+import { Pencil, Search, X } from "lucide-react-native";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -16,8 +18,12 @@ import Avatar from "@/components/Avatar";
 import EmptyState from "@/components/EmptyState";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
-import { getConversations } from "@/services/tryit-service";
-import type { ConversationItem } from "@/types/models";
+import {
+  getConversations,
+  getOrCreateConversation,
+  searchUsers,
+} from "@/services/tryit-service";
+import type { AuthorProfile, ConversationItem } from "@/types/models";
 import { formatCount, timeAgo } from "@/utils/format";
 
 export default function MessagesTabScreen() {
@@ -25,12 +31,42 @@ export default function MessagesTabScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const [searching, setSearching] = useState<boolean>(false);
+  const [query, setQuery] = useState<string>("");
+  const [starting, setStarting] = useState<boolean>(false);
 
   const conversationsQuery = useQuery<ConversationItem[]>({
     queryKey: ["conversations", userId],
     queryFn: () => getConversations(),
     enabled: userId !== null,
   });
+
+  const userResults = useQuery<AuthorProfile[]>({
+    queryKey: ["search-users-msg", query.trim()],
+    queryFn: () => searchUsers(query.trim()),
+    enabled: searching && query.trim().length > 0,
+  });
+
+  const handleStartChat = useCallback(
+    async (targetId: string, displayName: string) => {
+      if (starting || !userId) return;
+      setStarting(true);
+      try {
+        const conversationId = await getOrCreateConversation(targetId);
+        setSearching(false);
+        setQuery("");
+        router.push({
+          pathname: "/messages/[id]",
+          params: { id: conversationId, name: displayName },
+        });
+      } catch (e) {
+        console.log("[messages] start chat failed", e);
+      } finally {
+        setStarting(false);
+      }
+    },
+    [starting, userId, router],
+  );
 
   if (!userId) {
     return (
@@ -51,8 +87,83 @@ export default function MessagesTabScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
+        <TouchableOpacity
+          testID="new-message-button"
+          style={styles.newMsgBtn}
+          onPress={() => setSearching((s) => !s)}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Pencil size={22} color={Colors.flameOrange} />
+        </TouchableOpacity>
       </View>
-      {conversationsQuery.isLoading ? (
+
+      {searching ? (
+        <View style={styles.searchBar}>
+          <Search size={18} color={Colors.mutedText} />
+          <TextInput
+            testID="msg-search-input"
+            style={styles.searchInput}
+            placeholder="Search people to message..."
+            placeholderTextColor={Colors.inactiveIcon}
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            returnKeyType="search"
+            autoFocus
+          />
+          {query.length > 0 ? (
+            <TouchableOpacity onPress={() => setQuery("")}>
+              <X size={18} color={Colors.mutedText} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
+
+      {searching ? (
+        userResults.isLoading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={Colors.flameOrange} />
+          </View>
+        ) : (
+          <FlatList
+            data={userResults.data ?? []}
+            keyExtractor={(item) => item.id}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.row}
+                testID={`msg-user-${item.id}`}
+                onPress={() => handleStartChat(item.id, item.display_name)}
+                disabled={starting}
+              >
+                <Avatar uri={item.avatar_url} name={item.display_name} size={48} />
+                <View style={styles.body}>
+                  <Text style={styles.name} numberOfLines={1}>
+                    {item.display_name}
+                  </Text>
+                  <Text style={styles.handle}>@{item.username}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              query.trim().length > 0 ? (
+                <EmptyState
+                  emoji="🔍"
+                  title="No people found"
+                  subtitle={`No results for "${query.trim()}" — try another name.`}
+                />
+              ) : (
+                <EmptyState
+                  emoji="🔍"
+                  title="Search for someone"
+                  subtitle="Type a name or username to start a conversation."
+                />
+              )
+            }
+            contentContainerStyle={{ paddingBottom: 32 }}
+          />
+        )
+      ) : conversationsQuery.isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.flameOrange} />
         </View>
@@ -106,7 +217,7 @@ export default function MessagesTabScreen() {
             <EmptyState
               emoji="✉️"
               title="No conversations yet"
-              subtitle="Visit a profile and tap the message icon to start chatting."
+              subtitle="Tap the pencil button to start a new conversation."
             />
           }
           contentContainerStyle={{ paddingVertical: 8, paddingBottom: 32 }}
@@ -122,13 +233,38 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   headerTitle: {
     color: Colors.text,
     fontSize: 24,
-    fontFamily: "Sora_800ExtraBold",
+    fontWeight: "800" as const,
+  },
+  newMsgBtn: {
+    padding: 8,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: Colors.softGray,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    color: Colors.text,
+    fontSize: 14,
+    padding: 0,
   },
   centered: {
     flex: 1,
@@ -154,14 +290,17 @@ const styles = StyleSheet.create({
   name: {
     color: Colors.text,
     fontSize: 15,
-    fontFamily: "Sora_700Bold",
+    fontWeight: "700" as const,
     flex: 1,
     marginRight: 8,
+  },
+  handle: {
+    color: Colors.mutedText,
+    fontSize: 13,
   },
   time: {
     color: Colors.mutedText,
     fontSize: 12,
-    fontFamily: "Sora_400Regular",
   },
   bottomRow: {
     flexDirection: "row",
@@ -173,11 +312,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     flex: 1,
     marginRight: 8,
-    fontFamily: "Sora_400Regular",
   },
   previewUnread: {
     color: Colors.text,
-    fontFamily: "Sora_600SemiBold",
+    fontWeight: "600" as const,
   },
   badge: {
     backgroundColor: Colors.flameOrange,
@@ -191,6 +329,6 @@ const styles = StyleSheet.create({
   badgeText: {
     color: "#FFFFFF",
     fontSize: 11,
-    fontFamily: "Sora_700Bold",
+    fontWeight: "700" as const,
   },
 });

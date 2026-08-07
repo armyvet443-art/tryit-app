@@ -71,7 +71,7 @@ function RootLayoutNav() {
       <Stack.Screen name="auth/update-password" options={{ title: "New Password", presentation: "fullScreenModal" }} />
       <Stack.Screen name="post/[id]" options={{ title: "Post" }} />
       <Stack.Screen name="user/[id]" options={{ title: "Profile" }} />
-      <Stack.Screen name="messages/index" options={{ title: "Messages" }} />
+      <Stack.Screen name="messages/index" options={{ title: "Messages", headerShown: false }} />
       <Stack.Screen name="messages/[id]" options={{ title: "Chat" }} />
       <Stack.Screen name="settings" options={{ title: "Settings" }} />
       <Stack.Screen name="edit-profile" options={{ title: "Edit Profile" }} />

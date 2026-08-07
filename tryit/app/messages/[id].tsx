@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Send } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -35,6 +35,7 @@ export default function ChatScreen() {
   const listRef = useRef<FlatList<MessageItem>>(null);
   const [text, setText] = useState<string>("");
   const [sending, setSending] = useState<boolean>(false);
+  const sendingRef = useRef<boolean>(false);
 
   const messagesQuery = useQuery<MessageItem[]>({
     queryKey: ["messages", conversationId],
@@ -70,20 +71,43 @@ export default function ChatScreen() {
 
   const handleSend = useCallback(async () => {
     const content = text.trim();
-    if (content.length === 0 || sending) return;
+    if (content.length === 0 || sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
     setText("");
+
+    // Optimistic: append message to cache immediately
+    const optimisticMsg: MessageItem = {
+      id: `temp-${Date.now()}`,
+      conversation_id: conversationId,
+      sender_id: userId ?? "",
+      content,
+      message_type: "text",
+      media_url: null,
+      created_at: new Date().toISOString(),
+    };
+    queryClient.setQueryData<MessageItem[]>(["messages", conversationId], (old) => [
+      ...(old ?? []),
+      optimisticMsg,
+    ]);
+
     try {
       await sendMessage(conversationId, content);
+      // Refetch to get the real message with server ID + correct timestamp
       queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
     } catch (e) {
       console.log("[chat] send failed", e);
+      // Rollback: remove the optimistic message and restore text
+      queryClient.setQueryData<MessageItem[]>(["messages", conversationId], (old) =>
+        (old ?? []).filter((m) => m.id !== optimisticMsg.id),
+      );
       setText(content);
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
-  }, [text, sending, conversationId, queryClient, userId]);
+  }, [text, conversationId, queryClient, userId]);
 
   const messages = messagesQuery.data ?? [];
 
