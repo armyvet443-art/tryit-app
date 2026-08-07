@@ -2064,6 +2064,33 @@ export type Database = {
           },
         ]
       }
+      push_tokens: {
+        Row: {
+          created_at: string | null
+          id: string
+          platform: string | null
+          token: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          platform?: string | null
+          token: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          platform?: string | null
+          token?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       reactions: {
         Row: {
           created_at: string | null
@@ -3134,25 +3161,42 @@ export type Database = {
           viral_score: number
         }[]
       }
-      get_conversation_messages: {
-        Args: { p_before?: string; p_conversation_id: string; p_limit?: number }
-        Returns: {
-          content: string
-          conversation_id: string
-          created_at: string
-          id: string
-          is_deleted: boolean
-          is_read: boolean
-          media_url: string
-          message_type: Database["public"]["Enums"]["message_type"]
-          sender_avatar_url: string
-          sender_display_name: string
-          sender_id: string
-          sender_username: string
-          shared_post_data: Json
-          shared_post_id: string
-        }[]
-      }
+      get_conversation_messages:
+        | {
+            Args: {
+              p_before?: string
+              p_conversation_id: string
+              p_limit?: number
+            }
+            Returns: {
+              content: string
+              conversation_id: string
+              created_at: string
+              id: string
+              is_deleted: boolean
+              is_read: boolean
+              media_url: string
+              message_type: Database["public"]["Enums"]["message_type"]
+              sender_avatar_url: string
+              sender_display_name: string
+              sender_id: string
+              sender_username: string
+              shared_post_data: Json
+              shared_post_id: string
+            }[]
+          }
+        | {
+            Args: { p_conversation_id: string; p_limit?: number }
+            Returns: {
+              content: string
+              conversation_id: string
+              created_at: string
+              id: string
+              media_url: string
+              message_type: Database["public"]["Enums"]["message_type"]
+              sender_id: string
+            }[]
+          }
       get_conversations_by_type: {
         Args: { p_account_type: string }
         Returns: {
@@ -3520,13 +3564,8 @@ export type Database = {
         Args: never
         Returns: {
           conversation_id: string
-          is_muted: boolean
-          is_online: boolean
-          is_pinned: boolean
           last_message_at: string
-          last_message_sender_id: string
           last_message_text: string
-          last_seen_at: string
           other_avatar_url: string
           other_display_name: string
           other_user_id: string
@@ -3622,17 +3661,22 @@ export type Database = {
         }
         Returns: Json
       }
-      send_message: {
-        Args: {
-          p_content?: string
-          p_conversation_id: string
-          p_media_url?: string
-          p_message_type?: string
-          p_shared_post_data?: Json
-          p_shared_post_id?: string
-        }
-        Returns: string
-      }
+      send_message:
+        | {
+            Args: { p_content: string; p_conversation_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_content?: string
+              p_conversation_id: string
+              p_media_url?: string
+              p_message_type?: string
+              p_shared_post_data?: Json
+              p_shared_post_id?: string
+            }
+            Returns: string
+          }
       send_message_request: {
         Args: { p_recipient_id: string }
         Returns: string
