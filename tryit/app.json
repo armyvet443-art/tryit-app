@@ -1,21 +1,15 @@
 {
   "expo": {
-    "name": "TryIt",
-    "slug": "6rhx33qbphevphc7gvvp0",
+    "name": "tryit",
+    "slug": "tryit",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "rork-app",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.rork.6rhx33qbphevphc7gvvp0",
+      "bundleIdentifier": "com.tryitapp.app",
       "buildNumber": "24"
     },
     "android": {
@@ -23,7 +17,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.6rhx33qbphevphc7gvvp0"
+      "package": "com.tryitapp.app"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -44,10 +38,27 @@
           "color": "#FF6A00",
           "defaultChannel": "default"
         }
-      ]
+      ],
+      "@sentry/react-native",
+      "expo-image",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "imageWidth": 200
+        }
+      ],
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "60a4ce8f-e2d7-4ac3-80d8-0c5a8de3d1a5"
+      }
     }
   }
 }
