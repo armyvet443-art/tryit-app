@@ -88,7 +88,7 @@ function VideoTile({ item, active }: { item: MediaItem; active: boolean }) {
         style={styles.media}
         contentFit="cover"
         nativeControls={false}
-        allowsFullscreen
+        fullscreenOptions={{ enable: true }}
         allowsPictureInPicture
       />
       <TouchableOpacity

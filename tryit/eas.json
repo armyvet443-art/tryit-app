@@ -1,40 +1,42 @@
 {
-  "cli": {
-    "version": ">= 21.0.0"
-  },
-  "build": {
-    "preview": {
-      "android": {
-        "buildType": "apk"
-      },
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://vhodwfkxvodppfgmtmdi.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Msp-8Geaixn3qs-Vq8d8Yw_52KOfnpg",
-        "EXPO_PUBLIC_SENTRY_DSN": "https://02dea2470a4db2351750f9e04bdedc8f@o4511856553623552.ingest.us.sentry.io/4511856559325184",
-        "EXPO_PUBLIC_RORK_AUTH_URL": "https://api.rork.com",
-        "EXPO_PUBLIC_RORK_API_BASE_URL": "https://dev-6rhx33qbphevphc7gvvp0.rorktest.dev",
-        "EXPO_PUBLIC_RORK_FUNCTIONS_URL": "https://tryit-rn-migration-backend.rork.app",
-        "EXPO_PUBLIC_TOOLKIT_URL": "https://toolkit.rork.com",
-        "EXPO_PUBLIC_PROJECT_ID": "6rhx33qbphevphc7gvvp0",
-        "EXPO_PUBLIC_TEAM_ID": "0abd0226-c84e-4bf3-986d-c4dbde7c59fe",
-        "EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY": "rork_sk_jxmhb3m9xdod5i0zewdgkgrpvmgrqz3i",
-        "EXPO_ROUTER_DISABLE_RN_NAVIGATION_CHECK": "1"
-      }
-    },
-    "production": {
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://vhodwfkxvodppfgmtmdi.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Msp-8Geaixn3qs-Vq8d8Yw_52KOfnpg",
-        "EXPO_PUBLIC_SENTRY_DSN": "https://02dea2470a4db2351750f9e04bdedc8f@o4511856553623552.ingest.us.sentry.io/4511856559325184",
-        "EXPO_PUBLIC_RORK_AUTH_URL": "https://api.rork.com",
-        "EXPO_PUBLIC_RORK_API_BASE_URL": "https://dev-6rhx33qbphevphc7gvvp0.rorktest.dev",
-        "EXPO_PUBLIC_RORK_FUNCTIONS_URL": "https://tryit-rn-migration-backend.rork.app",
-        "EXPO_PUBLIC_TOOLKIT_URL": "https://toolkit.rork.com",
-        "EXPO_PUBLIC_PROJECT_ID": "6rhx33qbphevphc7gvvp0",
-        "EXPO_PUBLIC_TEAM_ID": "0abd0226-c84e-4bf3-986d-c4dbde7c59fe",
-        "EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY": "rork_sk_jxmhb3m9xdod5i0zewdgkgrpvmgrqz3i",
-        "EXPO_ROUTER_DISABLE_RN_NAVIGATION_CHECK": "1"
-      }
-    }
-  }
+  "cli": {
+    "version": ">= 21.0.0"
+  },
+  "build": {
+    "preview": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "EXPO_ROUTER_DISABLE_RN_NAVIGATION_CHECK": "1",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://vhodwfkxvodppfgmtmdi.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Msp-8Geaixn3qs-Vq8d8Yw_52KOfnpg",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://02dea2470a4db2351750f9e04bdedc8f@o4511856553623552.ingest.us.sentry.io/4511856559325184",
+        "EXPO_PUBLIC_RORK_AUTH_URL": "https://api.rork.com",
+        "EXPO_PUBLIC_RORK_API_BASE_URL": "https://dev-6rhx33qbphevphc7gvvp0.rorktest.dev",
+        "EXPO_PUBLIC_RORK_FUNCTIONS_URL": "https://tryit-rn-migration-backend.rork.app",
+        "EXPO_PUBLIC_TOOLKIT_URL": "https://toolkit.rork.com",
+        "EXPO_PUBLIC_PROJECT_ID": "6rhx33qbphevphc7gvvp0",
+        "EXPO_PUBLIC_TEAM_ID": "0abd0226-c84e-4bf3-986d-c4dbde7c59fe",
+        "EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY": "rork_sk_jxmhb3m9xdod5i0zewdgkgrpvmgrqz3i"
+      }
+    },
+    "production": {
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "EXPO_ROUTER_DISABLE_RN_NAVIGATION_CHECK": "1",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://vhodwfkxvodppfgmtmdi.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Msp-8Geaixn3qs-Vq8d8Yw_52KOfnpg",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://02dea2470a4db2351750f9e04bdedc8f@o4511856553623552.ingest.us.sentry.io/4511856559325184",
+        "EXPO_PUBLIC_RORK_AUTH_URL": "https://api.rork.com",
+        "EXPO_PUBLIC_RORK_API_BASE_URL": "https://dev-6rhx33qbphevphc7gvvp0.rorktest.dev",
+        "EXPO_PUBLIC_RORK_FUNCTIONS_URL": "https://tryit-rn-migration-backend.rork.app",
+        "EXPO_PUBLIC_TOOLKIT_URL": "https://toolkit.rork.com",
+        "EXPO_PUBLIC_PROJECT_ID": "6rhx33qbphevphc7gvvp0",
+        "EXPO_PUBLIC_TEAM_ID": "0abd0226-c84e-4bf3-986d-c4dbde7c59fe",
+        "EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY": "rork_sk_jxmhb3m9xdod5i0zewdgkgrpvmgrqz3i"
+      }
+    }
+  }
 }

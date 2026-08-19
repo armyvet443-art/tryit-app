@@ -1,7 +1,6 @@
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
 import { Bookmark, Flame, Trash2 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import {

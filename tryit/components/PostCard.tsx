@@ -128,7 +128,7 @@ function FeedVideoTile({ url, onDoubleTap, inView }: { url: string; onDoubleTap:
             style={feedVideoStyles.video}
             contentFit="cover"
             nativeControls={false}
-            allowsFullscreen
+            fullscreenOptions={{ enable: true }}
             allowsPictureInPicture
           />
           {userPaused ? (

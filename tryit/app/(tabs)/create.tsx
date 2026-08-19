@@ -84,7 +84,7 @@ function VideoPreviewSlot({
         style={styles.mediaPreview}
         contentFit="cover"
         nativeControls={false}
-        allowsFullscreen={false}
+        fullscreenOptions={{ enable: false }}
         allowsPictureInPicture={false}
       />
       {!playing ? (
