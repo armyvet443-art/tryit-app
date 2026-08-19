@@ -1,5 +1,5 @@
 {
-  "name": "expo-app",
+  "name": "tryit",
   "version": "1.0.0",
   "private": true,
   "main": "expo-router/entry",
@@ -67,5 +67,6 @@
     "@teovilla/react-native-web-maps": {
       "expo-location": "57.0.11"
     }
-  }
+  },
+  "packageManager": "npm@10.0.0"
 }
