@@ -42,17 +42,18 @@
       "@sentry/react-native",
       "expo-image",
       [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "imageWidth": 200
-        }
-      ],
-      "expo-status-bar"
-    ],
-    "experiments": {
-      "typedRoutes": true
-    },
-    
+            "expo-splash-screen",
+    {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff",
+      "imageWidth": 200
+    }
+  ],
+  "expo-status-bar"
+  ],
+  "experiments": {
+    "typedRoutes": true
+  }
+}
+}
