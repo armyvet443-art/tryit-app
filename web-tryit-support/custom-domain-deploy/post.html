@@ -72,10 +72,14 @@ if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(postI
   return unavailable();
 }
 
+// True HTML entity escaping — the previous textContent round-trip returned
+// raw text (escaping nothing), so a title/caption/username containing " or
+// < could break out of attributes (XSS). Media URLs are additionally
+// allowlisted by safeMedia() before any src attribute is built.
 function esc(s) {
-  var d = document.createElement("div");
-  d.textContent = s == null ? "" : String(s);
-  return d.textContent;
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
 }
 
 function unavailable() {
@@ -110,7 +114,7 @@ function parseJsonItems(raw, out) {
 
 // Media lives in media_url (a JSON array string, or a plain URL on older
 // posts); media_urls is an unused legacy column that is always empty.
-// Mirrors the share-card edge function's parse.
+// Mirrors the share-card endpoint's parse.
 function parseMedia(post) {
   var items = [];
   if (Array.isArray(post.media_urls) && post.media_urls.length) items = items.concat(post.media_urls);
