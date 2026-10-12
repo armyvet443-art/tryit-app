@@ -8,6 +8,7 @@
 <meta property="og:title" content="TryIt — Discover. Try. Inspire.">
 <meta property="og:description" content="A Try shared from TryIt. See the full Try in the app.">
 <meta property="og:image" content="/icon.png">
+<link rel="icon" href="/icon.png">
 <style>
 :root{--bg:#0F0F0F;--surface:#1A1A1A;--line:#2E2E2E;--text:#F5F5F5;--muted:#9A9A9A;--accent:#FF6A00}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -62,6 +63,7 @@ footer a{color:var(--muted)}
 var SUPABASE_URL = "https://vhodwfkxvodppfgmtmdi.supabase.co";
 var SUPABASE_ANON_KEY = "sb_publishable_Msp-8Geaixn3qs-Vq8d8Yw_52KOfnpg";
 var APP_STORE_URL = "https://apps.apple.com/us/app/tryit-discover-try-inspire/id6810960190";
+var MEDIA_PREFIX = SUPABASE_URL + "/storage/v1/object/public/post-media/";
 
 // /post/:id (Vercel rewrite keeps the path; also tolerate ?id= for safety).
 var match = location.pathname.match(/\/post\/([0-9a-fA-F-]{36})\/?$/);
@@ -93,42 +95,76 @@ function rest(table, query) {
   });
 }
 
+function safeMedia(u) {
+  // Only app-managed storage URLs are ever rendered.
+  return typeof u === "string" && u.indexOf(MEDIA_PREFIX) === 0 ? u : null;
+}
+
+function parseJsonItems(raw, out) {
+  try {
+    var arr = JSON.parse(raw);
+    if (Array.isArray(arr)) for (var i = 0; i < arr.length; i++) out.push(arr[i]);
+    else if (arr && typeof arr === "object") out.push(arr);
+  } catch (e) { /* malformed data: skip */ }
+}
+
+// Media lives in media_url (a JSON array string, or a plain URL on older
+// posts); media_urls is an unused legacy column that is always empty.
+// Mirrors the share-card edge function's parse.
+function parseMedia(post) {
+  var items = [];
+  if (Array.isArray(post.media_urls) && post.media_urls.length) items = items.concat(post.media_urls);
+  else if (typeof post.media_urls === "string" && post.media_urls.trim().charAt(0) === "[") {
+    parseJsonItems(post.media_urls, items);
+  }
+  var raw = post.media_url;
+  if (typeof raw === "string" && raw.length > 0) {
+    var c = raw.trim().charAt(0);
+    if (c === "[" || c === "{") parseJsonItems(raw, items);
+    else items.push({ url: raw, type: post.media_type === "video" ? "video" : "image", thumbnail: null });
+  }
+  return items;
+}
+
 // RLS-mediated anon read: deleted/removed/inaccessible posts simply return
 // no rows. No privileged access, no private media URLs.
-rest("posts", "?select=id,title,caption,media_urls,media_type,thumbnail_url,user_id&id=eq." + postId)
+rest("posts", "?select=id,title,caption,media_url,media_urls,media_type,thumbnail_url,user_id&id=eq." + postId)
   .then(function (rows) {
     var post = rows && rows[0];
     if (!post) return unavailable();
 
-    // First photo, or the video poster thumbnail — never a video file.
-    var mediaSrc = null, isVideo = false;
-    var items = [];
-    if (typeof post.media_urls === "string" && post.media_urls.trim().charAt(0) === "[") {
-      try { items = JSON.parse(post.media_urls) || []; } catch (e) { items = []; }
-    }
+    var items = parseMedia(post);
+    var mediaSrc = null;
+    var showingVideoThumb = false;
+    var isVideo = post.media_type === "video";
+    var videoThumb = safeMedia(post.thumbnail_url);
+
     for (var i = 0; i < items.length; i++) {
       var m = items[i] || {};
-      if (!mediaSrc && m.type === "image" && m.url) mediaSrc = m.url;
-      if (!isVideo && m.type === "video") isVideo = true;
-      if (!isVideo || mediaSrc) { /* keep scanning for an image first */ }
-    }
-    if (!mediaSrc && isVideo) {
-      for (var j = 0; j < items.length; j++) {
-        if (items[j] && items[j].thumbnail) { mediaSrc = items[j].thumbnail; break; }
+      var u = safeMedia(m.url);
+      if (!u) continue;
+      if (!mediaSrc && m.type === "image") mediaSrc = u;
+      if (m.type === "video") {
+        isVideo = true;
+        if (!videoThumb) videoThumb = safeMedia(m.thumbnail);
       }
-      if (!mediaSrc && post.thumbnail_url) mediaSrc = post.thumbnail_url;
+    }
+    // Video with no photo: show the poster thumbnail, never a video file.
+    if (!mediaSrc && isVideo && videoThumb) {
+      mediaSrc = videoThumb;
+      showingVideoThumb = true;
     }
 
     rest("user_profiles", "?select=username,display_name&id=eq." + encodeURIComponent(post.user_id))
       .then(function (prows) {
         var p = (prows && prows[0]) || {};
-        render(post, p, mediaSrc, isVideo);
+        render(post, p, mediaSrc, isVideo, showingVideoThumb);
       })
-      .catch(function () { render(post, {}, mediaSrc, isVideo); });
+      .catch(function () { render(post, {}, mediaSrc, isVideo, showingVideoThumb); });
   })
   .catch(function () { unavailable(); });
 
-function render(post, profile, mediaSrc, isVideo) {
+function render(post, profile, mediaSrc, isVideo, showingVideoThumb) {
   var username = (profile.username || "").trim();
   var displayName = (profile.display_name || "").trim() || username || "TryIt creator";
   var initial = displayName.charAt(0).toUpperCase();
@@ -139,7 +175,7 @@ function render(post, profile, mediaSrc, isVideo) {
   if (mediaSrc) {
     mediaHtml = '<div class="mediaWrap"><img class="media" src="' + esc(mediaSrc) +
       '" alt="" loading="eager" onerror="this.parentNode.style.display=\'none\'">' +
-      (isVideo ? '<div class="playBadge">▶ Video</div>' : "") + "</div>";
+      (showingVideoThumb ? '<div class="playBadge">▶ Video</div>' : "") + "</div>";
   }
 
   document.title = title ? displayName + " on TryIt — " + title : "TryIt — Discover. Try. Inspire.";
