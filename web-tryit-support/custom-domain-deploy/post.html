@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TryIt — Discover. Try. Inspire.</title>
+<meta name="description" content="A Try shared from TryIt — Discover. Try. Inspire.">
+<meta property="og:title" content="TryIt — Discover. Try. Inspire.">
+<meta property="og:description" content="A Try shared from TryIt. See the full Try in the app.">
+<meta property="og:image" content="/icon.png">
+<style>
+:root{--bg:#0F0F0F;--surface:#1A1A1A;--line:#2E2E2E;--text:#F5F5F5;--muted:#9A9A9A;--accent:#FF6A00}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;padding:0 20px 56px;max-width:560px;margin:0 auto;min-height:100vh}
+header{padding:24px 0 8px;display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#FF6A00,#FF9440);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;flex:none}
+.brand{font-size:21px;font-weight:800}
+.tagline{color:var(--muted);font-size:13px}
+.card{margin-top:20px;background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.media{width:100%;display:block;background:#161616;object-fit:contain;max-height:70vh}
+.mediaWrap{position:relative}
+.playBadge{position:absolute;right:14px;bottom:14px;background:rgba(15,15,15,.72);color:#fff;border-radius:999px;padding:7px 14px;font-size:13px;font-weight:700}
+.body{padding:20px}
+.who{display:flex;align-items:center;gap:10px}
+.avatar{width:42px;height:42px;border-radius:21px;background:#262626;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;flex:none}
+.names{min-width:0}
+.dn{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.un{color:var(--accent);font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.title{margin-top:16px;font-size:17px;font-weight:600;word-break:break-word}
+.caption{margin-top:8px;font-size:15px;color:#CFCFCF;word-break:break-word}
+.cta{display:block;margin-top:22px;background:var(--accent);color:#fff;text-align:center;text-decoration:none;font-weight:700;padding:15px 26px;border-radius:13px;font-size:16px}
+.cta:active{transform:scale(.985)}
+.note{color:var(--muted);font-size:13px;margin-top:12px;text-align:center}
+.center{margin-top:56px;text-align:center}
+.center .logo{margin:0 auto 16px}
+.center h1{font-size:20px}
+.center p{color:var(--muted);font-size:15px;margin-top:10px}
+footer{margin-top:40px;text-align:center;color:var(--muted);font-size:12px}
+footer a{color:var(--muted)}
+.skeleton{height:340px;background:linear-gradient(110deg,#1A1A1A 30%,#222 45%,#1A1A1A 70%);background-size:200% 100%;animation:sk 1.2s infinite linear}
+@keyframes sk{to{background-position:-200% 0}}
+</style>
+</head>
+<body>
+<header>
+<div class="logo">T</div>
+<div>
+  <div class="brand">TryIt</div>
+  <div class="tagline">Discover. Try. Inspire.</div>
+</div>
+</header>
+
+<main id="main">
+<div class="card"><div class="skeleton"></div></div>
+</main>
+
+<footer><a href="/support">Support</a> &nbsp;·&nbsp; <a href="/terms">Terms</a> &nbsp;·&nbsp; <a href="/privacy-policy.html">Privacy</a></footer>
+
+<script>
+(function () {
+"use strict";
+var SUPABASE_URL = "https://vhodwfkxvodppfgmtmdi.supabase.co";
+var SUPABASE_ANON_KEY = "sb_publishable_Msp-8Geaixn3qs-Vq8d8Yw_52KOfnpg";
+var APP_STORE_URL = "https://apps.apple.com/us/app/tryit-discover-try-inspire/id6810960190";
+
+// /post/:id (Vercel rewrite keeps the path; also tolerate ?id= for safety).
+var match = location.pathname.match(/\/post\/([0-9a-fA-F-]{36})\/?$/);
+var postId = match ? match[1].toLowerCase() : (new URLSearchParams(location.search).get("id") || "");
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(postId)) {
+  return unavailable();
+}
+
+function esc(s) {
+  var d = document.createElement("div");
+  d.textContent = s == null ? "" : String(s);
+  return d.textContent;
+}
+
+function unavailable() {
+  document.getElementById("main").innerHTML =
+    '<div class="center"><div class="logo">T</div><h1>This Try is no longer available</h1>' +
+    "<p>The link may be old, or the Try may have been removed by its creator.</p>" +
+    '<a class="cta" style="margin-top:26px" href="' + APP_STORE_URL + '">Get TryIt</a>' +
+    '<p class="note">Discover. Try. Inspire.</p></div>';
+}
+
+function rest(table, query) {
+  return fetch(SUPABASE_URL + "/rest/v1/" + table + query, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY }
+  }).then(function (r) {
+    if (!r.ok) throw new Error("rest_" + r.status);
+    return r.json();
+  });
+}
+
+// RLS-mediated anon read: deleted/removed/inaccessible posts simply return
+// no rows. No privileged access, no private media URLs.
+rest("posts", "?select=id,title,caption,media_urls,media_type,thumbnail_url,user_id&id=eq." + postId)
+  .then(function (rows) {
+    var post = rows && rows[0];
+    if (!post) return unavailable();
+
+    // First photo, or the video poster thumbnail — never a video file.
+    var mediaSrc = null, isVideo = false;
+    var items = [];
+    if (typeof post.media_urls === "string" && post.media_urls.trim().charAt(0) === "[") {
+      try { items = JSON.parse(post.media_urls) || []; } catch (e) { items = []; }
+    }
+    for (var i = 0; i < items.length; i++) {
+      var m = items[i] || {};
+      if (!mediaSrc && m.type === "image" && m.url) mediaSrc = m.url;
+      if (!isVideo && m.type === "video") isVideo = true;
+      if (!isVideo || mediaSrc) { /* keep scanning for an image first */ }
+    }
+    if (!mediaSrc && isVideo) {
+      for (var j = 0; j < items.length; j++) {
+        if (items[j] && items[j].thumbnail) { mediaSrc = items[j].thumbnail; break; }
+      }
+      if (!mediaSrc && post.thumbnail_url) mediaSrc = post.thumbnail_url;
+    }
+
+    rest("user_profiles", "?select=username,display_name&id=eq." + encodeURIComponent(post.user_id))
+      .then(function (prows) {
+        var p = (prows && prows[0]) || {};
+        render(post, p, mediaSrc, isVideo);
+      })
+      .catch(function () { render(post, {}, mediaSrc, isVideo); });
+  })
+  .catch(function () { unavailable(); });
+
+function render(post, profile, mediaSrc, isVideo) {
+  var username = (profile.username || "").trim();
+  var displayName = (profile.display_name || "").trim() || username || "TryIt creator";
+  var initial = displayName.charAt(0).toUpperCase();
+  var title = (post.title || "").trim();
+  var caption = (post.caption || "").trim();
+
+  var mediaHtml = "";
+  if (mediaSrc) {
+    mediaHtml = '<div class="mediaWrap"><img class="media" src="' + esc(mediaSrc) +
+      '" alt="" loading="eager" onerror="this.parentNode.style.display=\'none\'">' +
+      (isVideo ? '<div class="playBadge">▶ Video</div>' : "") + "</div>";
+  }
+
+  document.title = title ? displayName + " on TryIt — " + title : "TryIt — Discover. Try. Inspire.";
+
+  document.getElementById("main").innerHTML =
+    '<div class="card">' + mediaHtml +
+    '<div class="body">' +
+    '<div class="who"><div class="avatar">' + esc(initial) + '</div><div class="names">' +
+    '<div class="dn">' + esc(displayName) + '</div>' +
+    (username ? '<div class="un">@' + esc(username) + "</div>" : "") +
+    "</div></div>" +
+    (title ? '<div class="title">' + esc(title) + "</div>" : "") +
+    (caption ? '<div class="caption">' + esc(caption) + "</div>" : "") +
+    '<a class="cta" href="' + APP_STORE_URL + '">Open in TryIt</a>' +
+    '<p class="note">Sign in to react, comment, and try it for yourself.</p>' +
+    "</div></div>";
+}
+})();
+</script>
+</body>
+</html>
